@@ -12,8 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 38477d2c3efe6d948ae0713b3a89a0f0, type: 3}
   m_Name: gamesettings
   m_EditorClassIdentifier: 
+  BoardLayout: {fileID: 11400000, guid: 9a90c4479ac44205a9a468c20ea4bce4, type: 2}
   BoardSizeX: 4
   BoardSizeY: 6
+  BoardLayerCount: 4
   MatchesMin: 3
   BottomCellCount: 5
   LevelMoves: 16

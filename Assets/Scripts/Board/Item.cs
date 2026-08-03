@@ -80,6 +80,23 @@ public class Item
 
     }
 
+    public void SetSortingOrder(int sortingOrder)
+    {
+        if (View == null) return;
+        SpriteRenderer spriteRenderer = View.GetComponent<SpriteRenderer>();
+        if (spriteRenderer) spriteRenderer.sortingOrder = sortingOrder;
+    }
+
+    public void SetBlockedVisual(bool isBlocked)
+    {
+        if (View == null) return;
+        SpriteRenderer spriteRenderer = View.GetComponent<SpriteRenderer>();
+        if (spriteRenderer == null) return;
+        spriteRenderer.color = isBlocked
+            ? new Color(0.45f, 0.45f, 0.45f, 1f)
+            : Color.white;
+    }
+
     internal void ShowAppearAnimation()
     {
         if (View == null) return;

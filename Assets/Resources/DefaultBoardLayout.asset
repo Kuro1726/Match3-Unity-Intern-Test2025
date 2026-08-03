@@ -1,0 +1,151 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8fd5f2c07c0e4efaa4d8080277dca965, type: 3}
+  m_Name: DefaultBoardLayout
+  m_EditorClassIdentifier: 
+  m_snapStep: 0.5
+  m_items:
+  - ItemType: 4
+    Layer: 0
+    GridPosition: {x: 0, y: 0}
+  - ItemType: 5
+    Layer: 0
+    GridPosition: {x: 1, y: 0}
+  - ItemType: 4
+    Layer: 0
+    GridPosition: {x: 2, y: 0}
+  - ItemType: 2
+    Layer: 0
+    GridPosition: {x: 3, y: 0}
+  - ItemType: 0
+    Layer: 0
+    GridPosition: {x: 0, y: 1}
+  - ItemType: 2
+    Layer: 0
+    GridPosition: {x: 1, y: 1}
+  - ItemType: 3
+    Layer: 0
+    GridPosition: {x: 2, y: 1}
+  - ItemType: 5
+    Layer: 0
+    GridPosition: {x: 3, y: 1}
+  - ItemType: 4
+    Layer: 0
+    GridPosition: {x: 0, y: 2}
+  - ItemType: 3
+    Layer: 0
+    GridPosition: {x: 1, y: 2}
+  - ItemType: 0
+    Layer: 0
+    GridPosition: {x: 2, y: 2}
+  - ItemType: 1
+    Layer: 0
+    GridPosition: {x: 3, y: 2}
+  - ItemType: 6
+    Layer: 0
+    GridPosition: {x: 0, y: 3}
+  - ItemType: 1
+    Layer: 0
+    GridPosition: {x: 1, y: 3}
+  - ItemType: 0
+    Layer: 0
+    GridPosition: {x: 2, y: 3}
+  - ItemType: 0
+    Layer: 0
+    GridPosition: {x: 3, y: 3}
+  - ItemType: 6
+    Layer: 0
+    GridPosition: {x: 0, y: 4}
+  - ItemType: 2
+    Layer: 0
+    GridPosition: {x: 1, y: 4}
+  - ItemType: 1
+    Layer: 0
+    GridPosition: {x: 2, y: 4}
+  - ItemType: 5
+    Layer: 0
+    GridPosition: {x: 3, y: 4}
+  - ItemType: 3
+    Layer: 0
+    GridPosition: {x: 0, y: 5}
+  - ItemType: 0
+    Layer: 0
+    GridPosition: {x: 1, y: 5}
+  - ItemType: 6
+    Layer: 0
+    GridPosition: {x: 2, y: 5}
+  - ItemType: 0
+    Layer: 0
+    GridPosition: {x: 3, y: 5}
+  - ItemType: 4
+    Layer: 1
+    GridPosition: {x: 0.5, y: 0.5}
+  - ItemType: 3
+    Layer: 1
+    GridPosition: {x: 1.5, y: 0.5}
+  - ItemType: 4
+    Layer: 1
+    GridPosition: {x: 2.5, y: 0.5}
+  - ItemType: 0
+    Layer: 1
+    GridPosition: {x: 0.5, y: 1.5}
+  - ItemType: 2
+    Layer: 1
+    GridPosition: {x: 1.5, y: 1.5}
+  - ItemType: 2
+    Layer: 1
+    GridPosition: {x: 2.5, y: 1.5}
+  - ItemType: 1
+    Layer: 1
+    GridPosition: {x: 0.5, y: 2.5}
+  - ItemType: 3
+    Layer: 1
+    GridPosition: {x: 1.5, y: 2.5}
+  - ItemType: 0
+    Layer: 1
+    GridPosition: {x: 2.5, y: 2.5}
+  - ItemType: 4
+    Layer: 1
+    GridPosition: {x: 0.5, y: 3.5}
+  - ItemType: 1
+    Layer: 1
+    GridPosition: {x: 1.5, y: 3.5}
+  - ItemType: 2
+    Layer: 1
+    GridPosition: {x: 2.5, y: 3.5}
+  - ItemType: 1
+    Layer: 1
+    GridPosition: {x: 0.5, y: 4.5}
+  - ItemType: 0
+    Layer: 1
+    GridPosition: {x: 1.5, y: 4.5}
+  - ItemType: 3
+    Layer: 1
+    GridPosition: {x: 2.5, y: 4.5}
+  - ItemType: 1
+    Layer: 2
+    GridPosition: {x: 1, y: 1}
+  - ItemType: 1
+    Layer: 2
+    GridPosition: {x: 2, y: 1}
+  - ItemType: 0
+    Layer: 2
+    GridPosition: {x: 1, y: 2}
+  - ItemType: 0
+    Layer: 2
+    GridPosition: {x: 2, y: 2}
+  - ItemType: 1
+    Layer: 2
+    GridPosition: {x: 1, y: 3}
+  - ItemType: 0
+    Layer: 2
+    GridPosition: {x: 2, y: 3}

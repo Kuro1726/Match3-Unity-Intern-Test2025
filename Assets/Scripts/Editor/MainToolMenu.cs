@@ -30,4 +30,18 @@ public class MainToolMenu
         Selection.activeObject = asset;
     }
 
+    [MenuItem(menuTitle + "Open Board Layout", false, 420)]
+    static void OpenBoardLayout()
+    {
+        GameSettings settings = Resources.Load<GameSettings>(Constants.GAME_SETTINGS_PATH);
+        if (settings == null || settings.BoardLayout == null)
+        {
+            EditorUtility.DisplayDialog("Board Layout", "Assign a BoardLayoutSO in Game Settings first.", "OK");
+            return;
+        }
+
+        EditorUtility.FocusProjectWindow();
+        Selection.activeObject = settings.BoardLayout;
+    }
+
 }

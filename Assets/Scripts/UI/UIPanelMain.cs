@@ -17,28 +17,10 @@ public class UIPanelMain : MonoBehaviour, IMenu
 
     private void Awake()
     {
-        if (btnMoves)
-        {
-            RectTransform playRect = btnMoves.transform as RectTransform;
-            playRect.anchoredPosition = new Vector2(0f, 90f);
-
-            btnMoves.onClick.AddListener(OnClickMoves);
-            btnAutoplay.onClick.AddListener(OnClickAutoplay);
-            btnAutoLose.onClick.AddListener(OnClickAutoLose);
-        }
+        if (btnMoves) btnMoves.onClick.AddListener(OnClickMoves);
+        if (btnAutoplay) btnAutoplay.onClick.AddListener(OnClickAutoplay);
+        if (btnAutoLose) btnAutoLose.onClick.AddListener(OnClickAutoLose);
         if (btnTimer) btnTimer.onClick.AddListener(OnClickTimer);
-    }
-
-    private Button CreateButton(Button source, string objectName, string label, Vector2 position)
-    {
-        Button button = Instantiate(source, source.transform.parent);
-        button.name = objectName;
-        button.onClick.RemoveAllListeners();
-        RectTransform rect = button.transform as RectTransform;
-        rect.anchoredPosition = position;
-        Text text = button.GetComponentInChildren<Text>();
-        if (text) text.text = label;
-        return button;
     }
 
     private void OnDestroy()

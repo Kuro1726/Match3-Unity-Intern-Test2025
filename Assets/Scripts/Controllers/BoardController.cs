@@ -54,9 +54,13 @@ public class BoardController : MonoBehaviour
         if (Input.GetMouseButtonDown(0) == false) return;
 
         Vector2 worldPosition = m_camera.ScreenToWorldPoint(Input.mousePosition);
-        RaycastHit2D hit = Physics2D.Raycast(worldPosition, Vector2.zero);
-        if (hit.collider == null) return;
-        TryMoveItemToTray(hit.collider.GetComponent<Cell>());
+        RaycastHit2D[] hits = Physics2D.RaycastAll(worldPosition, Vector2.zero);
+        Cell selectedCell = hits
+            .Select(hit => hit.collider.GetComponent<Cell>())
+            .Where(cell => m_board.IsCellSelectable(cell))
+            .OrderByDescending(cell => cell.BoardLayer)
+            .FirstOrDefault();
+        if (selectedCell != null) TryMoveItemToTray(selectedCell);
     }
 
     public void StartAutoPlay(GameManager.ePlayMode mode)
@@ -89,6 +93,7 @@ public class BoardController : MonoBehaviour
     private IEnumerator AutoWinCoroutine()
     {
         int itemsLeftInGroup = 0;
+        int targetLayer = -1;
         NormalItem.eNormalType targetType = default(NormalItem.eNormalType);
         yield return new WaitForSeconds(AutoActionDelay);
 
@@ -102,13 +107,11 @@ public class BoardController : MonoBehaviour
 
             if (itemsLeftInGroup == 0)
             {
-                Cell firstCell = m_board.FindFirstOccupiedCell();
-                if (firstCell == null) yield break;
-                targetType = ((NormalItem)firstCell.Item).ItemType;
+                if (m_board.TryFindSelectableTripleType(out targetType, out targetLayer) == false) yield break;
                 itemsLeftInGroup = RequiredMatchSize;
             }
 
-            Cell targetCell = m_board.FindCellOfType(targetType);
+            Cell targetCell = m_board.FindCellOfType(targetType, targetLayer);
             if (targetCell == null) yield break;
             TryMoveItemToTray(targetCell);
             itemsLeftInGroup--;

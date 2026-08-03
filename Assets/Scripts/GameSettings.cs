@@ -4,9 +4,13 @@ using UnityEngine;
 
 public class GameSettings : ScriptableObject
 {
+    public BoardLayoutSO BoardLayout;
+
     public int BoardSizeX = 5;
 
     public int BoardSizeY = 5;
+
+    public int BoardLayerCount = 2;
 
     public int MatchesMin = 3;
 

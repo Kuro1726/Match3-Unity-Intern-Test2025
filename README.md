@@ -1,9 +1,36 @@
 # Match3 Unity – Gameplay Rewrite Notes
 
+## Board Layout Inspector Tool
+
+- Board layouts are now stored in a separate BoardLayoutSO asset.
+- DefaultBoardLayout.asset contains the current 4 x 6, two-layer, 39-item level and is assigned in gamesettings.asset.
+- Each placement exposes Item Type, Layer, and Grid Position in the Inspector.
+- Grid positions snap to 0.5 units. Position (0, 0) is the bottom-left board cell.
+- The Inspector includes a board preview, list reordering, Snap All, Generate From Game Settings, and Assign To Game Settings actions.
+- The Inspector color legend now matches gameplay: Type 1 brown, Type 2 red, Type 3 yellow, Type 4 blue, Type 5 green, Type 6 purple, and Type 7 pink.
+- Layer tabs filter both the preview and item list so dense layouts remain readable.
+- Add New Layer creates the next half-cell-offset layer, fills it with valid groups of three, and updates BoardLayerCount in Game Settings.
+- Remove Layer deletes the selected layer (or the highest layer from All), shifts every higher layer down by one, reapplies the half-cell offset, and updates BoardLayerCount.
+- Item positions and layer indices are clamped to the valid board area when edited.
+- Adding an item to a full layer is rejected instead of placing it outside the board.
+- Existing out-of-bounds items are reported and can be removed with Remove Items Outside Board.
+- Same-layer items use a one-cell footprint; positions less than one unit apart on both axes are treated as overlapping and rejected.
+- Assign and asset saving are blocked while the layout has validation errors.
+- Every Type total across the full board must be divisible by three; per-layer Type counts remain divisible by three for the current Autoplay strategy.
+- Validation reports duplicate positions, negative layers, off-grid positions, and layer/type counts that are not divisible by three.
+- Runtime blocking is calculated from the authored positions: an overlapping item on any higher layer blocks the lower item.
+- If Game Settings has no valid BoardLayoutSO assigned, the previous generated-board implementation remains available as a fallback.
+
 Tài liệu này ghi lại các phần gameplay đã được thay đổi và những hạng mục sẽ triển khai tiếp theo.
 
 ## Cập nhật triển khai mới nhất
 
+- Board hiện hỗ trợ nhiều layer lệch nhau nửa ô; mặc định là 2 layer.
+- Mỗi item layer trên che tối đa 4 item layer dưới và item bị che không thể được chọn.
+- Item bị che được làm tối; trạng thái được cập nhật ngay khi blocker phía trên rời board.
+- Input, `AUTOPLAY` và `AUTO LOSE` đều chỉ được phép chọn item đang mở khóa.
+- Với board `4 × 6` và 2 layer, layer dưới có 24 item, layer trên có 15 item, tổng cộng 39 item.
+- Các button Home đã chuyển hoàn toàn sang GameObject thật trong scene; code không còn clone hoặc đổi vị trí button lúc runtime.
 - Khay dưới đã được đổi từ 7 ô thành đúng 5 ô.
 - Home screen hiện có ba lựa chọn: `PLAY`, `AUTOPLAY` và `AUTO LOSE`.
 - `AUTOPLAY` luôn bắt đầu từ board mới và chọn liên tiếp từng nhóm 3 item cùng loại cho tới khi thắng.

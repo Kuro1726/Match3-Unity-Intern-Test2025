@@ -1,11 +1,14 @@
 ﻿using System;
 using UnityEngine;
+using System.Collections.Generic;
 
 public class Cell : MonoBehaviour
 {
     public int BoardX { get; private set; }
 
     public int BoardY { get; private set; }
+
+    public int BoardLayer { get; private set; }
 
     public Item Item { get; private set; }
 
@@ -20,10 +23,33 @@ public class Cell : MonoBehaviour
 
     public bool IsEmpty => Item == null;
 
-    public void Setup(int cellX, int cellY)
+    private readonly List<Cell> m_blockers = new List<Cell>();
+
+    public bool IsBlocked
+    {
+        get
+        {
+            foreach (Cell blocker in m_blockers)
+            {
+                if (blocker != null && blocker.IsEmpty == false) return true;
+            }
+            return false;
+        }
+    }
+
+    public void Setup(int cellX, int cellY, int boardLayer = 0)
     {
         this.BoardX = cellX;
         this.BoardY = cellY;
+        this.BoardLayer = boardLayer;
+    }
+
+    public void AddBlocker(Cell blocker)
+    {
+        if (blocker != null && m_blockers.Contains(blocker) == false)
+        {
+            m_blockers.Add(blocker);
+        }
     }
 
     public bool IsNeighbour(Cell other)
@@ -47,6 +73,7 @@ public class Cell : MonoBehaviour
     {
         Item = item;
         Item.SetCell(this);
+        Item.SetSortingOrder(BoardLayer * 10);
     }
 
     public void ApplyItemPosition(bool withAppearAnimation)

@@ -6,8 +6,12 @@ public class Board
 {
     private readonly int m_boardSizeX;
     private readonly int m_boardSizeY;
-    private readonly int m_matchSize;
-    private readonly Cell[,] m_cells;
+    private readonly int m_matchSize = 3;
+    private readonly int m_layerCount;
+    private readonly BoardLayoutSO m_layout;
+    private readonly List<Cell[,]> m_layers = new List<Cell[,]>();
+    private readonly List<Cell> m_cells = new List<Cell>();
+    private readonly Dictionary<Cell, NormalItem.eNormalType> m_layoutItemTypes = new Dictionary<Cell, NormalItem.eNormalType>();
     private readonly Transform m_root;
     private int m_remainingItemCount;
 
@@ -18,51 +22,151 @@ public class Board
         m_root = root;
         m_boardSizeX = gameSettings.BoardSizeX;
         m_boardSizeY = gameSettings.BoardSizeY;
-        m_matchSize = 3;
-        m_cells = new Cell[m_boardSizeX, m_boardSizeY];
-        CreateBoard();
+        m_layerCount = Mathf.Max(1, gameSettings.BoardLayerCount);
+        m_layout = gameSettings.BoardLayout;
+        if (m_layout != null && m_layout.HasItems) CreateBoardFromLayout();
+        else CreateGeneratedBoard();
     }
 
-    private void CreateBoard()
+    private void CreateGeneratedBoard()
     {
         Vector3 origin = new Vector3(-m_boardSizeX * 0.5f + 0.5f, -m_boardSizeY * 0.5f + 0.5f, 0f);
-        GameObject prefab = Resources.Load<GameObject>(Constants.PREFAB_CELL_BACKGROUND);
-        for (int x = 0; x < m_boardSizeX; x++)
+        for (int layer = 0; layer < m_layerCount; layer++)
         {
-            for (int y = 0; y < m_boardSizeY; y++)
+            int width = m_boardSizeX - layer;
+            int height = m_boardSizeY - layer;
+            if (width <= 0 || height <= 0) break;
+
+            Cell[,] layerCells = new Cell[width, height];
+            Vector3 layerOffset = new Vector3(layer * 0.5f, layer * 0.5f, layer * -0.01f);
+            for (int x = 0; x < width; x++)
             {
-                GameObject view = GameObject.Instantiate(prefab, origin + new Vector3(x, y, 0f), Quaternion.identity, m_root);
-                view.name = string.Format("BoardCell_{0}_{1}", x, y);
-                Cell cell = view.GetComponent<Cell>();
-                cell.Setup(x, y);
-                m_cells[x, y] = cell;
+                for (int y = 0; y < height; y++)
+                {
+                    layerCells[x, y] = CreateCell(x, y, layer, origin + layerOffset + new Vector3(x, y, 0f));
+                }
+            }
+
+            if (layer > 0) AddBlockRelations(layerCells, m_layers[layer - 1]);
+            m_layers.Add(layerCells);
+        }
+    }
+
+    private void CreateBoardFromLayout()
+    {
+        Vector3 origin = new Vector3(-m_boardSizeX * 0.5f + 0.5f, -m_boardSizeY * 0.5f + 0.5f, 0f);
+        foreach (string error in m_layout.GetValidationErrors(m_boardSizeX, m_boardSizeY))
+        {
+            Debug.LogWarning("Board layout: " + error);
+        }
+
+        foreach (BoardItemPlacement placement in m_layout.Items)
+        {
+            if (placement == null) continue;
+            Vector2 gridPosition = m_layout.Snap(placement.GridPosition);
+            int boardX = Mathf.RoundToInt(gridPosition.x * 2f);
+            int boardY = Mathf.RoundToInt(gridPosition.y * 2f);
+            Vector3 worldPosition = origin + new Vector3(gridPosition.x, gridPosition.y, placement.Layer * -0.01f);
+            Cell cell = CreateCell(boardX, boardY, Mathf.Max(0, placement.Layer), worldPosition);
+            m_layoutItemTypes[cell] = placement.ItemType;
+        }
+
+        AddLayoutBlockRelations();
+    }
+
+    private void AddLayoutBlockRelations()
+    {
+        foreach (Cell lowerCell in m_cells)
+        {
+            foreach (Cell upperCell in m_cells)
+            {
+                if (upperCell.BoardLayer <= lowerCell.BoardLayer) continue;
+                Vector3 offset = upperCell.transform.position - lowerCell.transform.position;
+                if (Mathf.Abs(offset.x) < 0.999f && Mathf.Abs(offset.y) < 0.999f)
+                {
+                    lowerCell.AddBlocker(upperCell);
+                }
+            }
+        }
+    }
+
+    private Cell CreateCell(int x, int y, int layer, Vector3 position)
+    {
+        GameObject prefab = Resources.Load<GameObject>(Constants.PREFAB_CELL_BACKGROUND);
+        GameObject view = GameObject.Instantiate(prefab, position, Quaternion.identity, m_root);
+        view.name = string.Format("BoardCell_L{0}_{1}_{2}", layer, x, y);
+        Cell cell = view.GetComponent<Cell>();
+        cell.Setup(x, y, layer);
+        SpriteRenderer renderer = view.GetComponent<SpriteRenderer>();
+        if (renderer) renderer.sortingOrder = layer * 10;
+        m_cells.Add(cell);
+        return cell;
+    }
+
+    private void AddBlockRelations(Cell[,] upperLayer, Cell[,] lowerLayer)
+    {
+        for (int x = 0; x < upperLayer.GetLength(0); x++)
+        {
+            for (int y = 0; y < upperLayer.GetLength(1); y++)
+            {
+                Cell blocker = upperLayer[x, y];
+                lowerLayer[x, y].AddBlocker(blocker);
+                lowerLayer[x + 1, y].AddBlocker(blocker);
+                lowerLayer[x, y + 1].AddBlocker(blocker);
+                lowerLayer[x + 1, y + 1].AddBlocker(blocker);
             }
         }
     }
     public void Fill()
     {
-        int cellCount = m_boardSizeX * m_boardSizeY;
-        int playableItemCount = m_matchSize * (cellCount / m_matchSize);
-        FillCells(CreateBalancedItemTypes(playableItemCount));
-        m_remainingItemCount = playableItemCount;
-    }
-
-    private void FillCells(List<NormalItem.eNormalType> itemTypes)
-    {
-        int typeIndex = 0;
-        for (int y = 0; y < m_boardSizeY; y++)
+        m_remainingItemCount = 0;
+        if (m_layoutItemTypes.Count > 0)
         {
-            for (int x = 0; x < m_boardSizeX; x++)
+            FillLayout();
+        }
+        else
+        {
+            foreach (Cell[,] layerCells in m_layers)
             {
-                if (typeIndex >= itemTypes.Count) return;
-                NormalItem item = new NormalItem();
-                item.SetType(itemTypes[typeIndex++]);
-                item.SetView();
-                item.SetViewRoot(m_root);
-                m_cells[x, y].Assign(item);
-                m_cells[x, y].ApplyItemPosition(false);
+                FillLayer(layerCells);
             }
         }
+        RefreshBlockedVisuals();
+    }
+
+    private void FillLayout()
+    {
+        foreach (KeyValuePair<Cell, NormalItem.eNormalType> entry in m_layoutItemTypes)
+        {
+            AssignItem(entry.Key, entry.Value);
+        }
+    }
+
+    private void FillLayer(Cell[,] layerCells)
+    {
+        int cellCount = layerCells.GetLength(0) * layerCells.GetLength(1);
+        int playableCount = m_matchSize * (cellCount / m_matchSize);
+        List<NormalItem.eNormalType> itemTypes = CreateBalancedItemTypes(playableCount);
+        int typeIndex = 0;
+        for (int y = 0; y < layerCells.GetLength(1); y++)
+        {
+            for (int x = 0; x < layerCells.GetLength(0); x++)
+            {
+                if (typeIndex >= itemTypes.Count) return;
+                AssignItem(layerCells[x, y], itemTypes[typeIndex++]);
+            }
+        }
+    }
+
+    private void AssignItem(Cell cell, NormalItem.eNormalType itemType)
+    {
+        NormalItem item = new NormalItem();
+        item.SetType(itemType);
+        item.SetView();
+        item.SetViewRoot(m_root);
+        cell.Assign(item);
+        cell.ApplyItemPosition(false);
+        m_remainingItemCount++;
     }
     private List<NormalItem.eNormalType> CreateBalancedItemTypes(int itemCount)
     {
@@ -71,7 +175,8 @@ public class Board
         int groupCount = itemCount / m_matchSize;
         for (int group = 0; group < groupCount; group++)
         {
-            NormalItem.eNormalType type = (NormalItem.eNormalType)values.GetValue(group - values.Length * (group / values.Length));
+            int typeIndex = group - values.Length * (group / values.Length);
+            NormalItem.eNormalType type = (NormalItem.eNormalType)values.GetValue(typeIndex);
             for (int i = 0; i < m_matchSize; i++) result.Add(type);
         }
 
@@ -87,82 +192,107 @@ public class Board
     public bool TryTakeItem(Cell cell, out Item item)
     {
         item = null;
-        if (Contains(cell) == false) return false;
-        if (cell.IsEmpty) return false;
-
+        if (IsCellSelectable(cell) == false) return false;
         item = cell.Item;
         cell.Free();
         m_remainingItemCount--;
+        RefreshBlockedVisuals();
         return true;
     }
 
-    public Cell FindFirstOccupiedCell()
+    public bool IsCellSelectable(Cell cell)
     {
-        for (int y = 0; y < m_boardSizeY; y++)
+        return Contains(cell) && cell.IsEmpty == false && cell.IsBlocked == false;
+    }
+
+    public bool TryFindSelectableTripleType(out NormalItem.eNormalType itemType, out int boardLayer)
+    {
+        boardLayer = -1;
+        foreach (Cell cell in m_cells)
         {
-            for (int x = 0; x < m_boardSizeX; x++)
+            if (cell.IsEmpty == false && cell.BoardLayer > boardLayer)
             {
-                if (m_cells[x, y].IsEmpty == false) return m_cells[x, y];
+                boardLayer = cell.BoardLayer;
             }
+        }
+
+        if (boardLayer < 0)
+        {
+            itemType = default(NormalItem.eNormalType);
+            return false;
+        }
+
+        Dictionary<NormalItem.eNormalType, int> counts = new Dictionary<NormalItem.eNormalType, int>();
+        foreach (Cell cell in m_cells)
+        {
+            if (cell.BoardLayer != boardLayer || IsCellSelectable(cell) == false) continue;
+            NormalItem item = cell.Item as NormalItem;
+            if (item == null) continue;
+            int count;
+            counts.TryGetValue(item.ItemType, out count);
+            counts[item.ItemType] = count + 1;
+            if (count + 1 >= m_matchSize)
+            {
+                itemType = item.ItemType;
+                return true;
+            }
+        }
+        itemType = default(NormalItem.eNormalType);
+        return false;
+    }
+
+    public Cell FindCellOfType(NormalItem.eNormalType itemType, int boardLayer)
+    {
+        foreach (Cell cell in m_cells)
+        {
+            NormalItem item = cell.Item as NormalItem;
+            if (cell.BoardLayer == boardLayer && IsCellSelectable(cell) && item != null && item.ItemType == itemType) return cell;
         }
         return null;
     }
-
-    public Cell FindCellOfType(NormalItem.eNormalType itemType)
-    {
-        for (int y = 0; y < m_boardSizeY; y++)
-        {
-            for (int x = 0; x < m_boardSizeX; x++)
-            {
-                NormalItem item = m_cells[x, y].Item as NormalItem;
-                if (item != null && item.ItemType == itemType) return m_cells[x, y];
-            }
-        }
-        return null;
-    }
-
     public List<Cell> BuildAutoLosePlan(int targetCount, int maxItemsPerType)
     {
         List<Cell> result = new List<Cell>(targetCount);
         Dictionary<NormalItem.eNormalType, int> counts = new Dictionary<NormalItem.eNormalType, int>();
-        for (int y = 0; y < m_boardSizeY && result.Count < targetCount; y++)
+        foreach (Cell cell in m_cells)
         {
-            for (int x = 0; x < m_boardSizeX && result.Count < targetCount; x++)
-            {
-                NormalItem item = m_cells[x, y].Item as NormalItem;
-                if (item == null) continue;
-                int count;
-                counts.TryGetValue(item.ItemType, out count);
-                if (count >= maxItemsPerType) continue;
-                counts[item.ItemType] = count + 1;
-                result.Add(m_cells[x, y]);
-            }
+            if (result.Count >= targetCount) break;
+            if (IsCellSelectable(cell) == false) continue;
+            NormalItem item = cell.Item as NormalItem;
+            if (item == null) continue;
+            int count;
+            counts.TryGetValue(item.ItemType, out count);
+            if (count >= maxItemsPerType) continue;
+            counts[item.ItemType] = count + 1;
+            result.Add(cell);
         }
         return result;
     }
 
+    private void RefreshBlockedVisuals()
+    {
+        foreach (Cell cell in m_cells)
+        {
+            if (cell.Item != null) cell.Item.SetBlockedVisual(cell.IsBlocked);
+        }
+    }
+
     private bool Contains(Cell target)
     {
-        if (target == null) return false;
-        int x = target.BoardX;
-        int y = target.BoardY;
-        if (x < 0 || x >= m_boardSizeX) return false;
-        if (y < 0 || y >= m_boardSizeY) return false;
-        return m_cells[x, y] == target;
+        return target != null && m_cells.Contains(target);
     }
+
     public void Clear()
     {
-        for (int x = 0; x < m_boardSizeX; x++)
+        foreach (Cell cell in m_cells)
         {
-            for (int y = 0; y < m_boardSizeY; y++)
-            {
-                Cell cell = m_cells[x, y];
-                if (cell == null) continue;
-                cell.Clear();
-                GameObject.Destroy(cell.gameObject);
-                m_cells[x, y] = null;
-            }
+            if (cell == null) continue;
+            cell.Clear();
+            GameObject.Destroy(cell.gameObject);
         }
+        m_cells.Clear();
+        m_layers.Clear();
+        m_layoutItemTypes.Clear();
         m_remainingItemCount = 0;
     }
 }
