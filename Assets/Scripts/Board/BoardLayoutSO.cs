@@ -85,6 +85,16 @@ public class BoardLayoutSO : ScriptableObject
             }
         }
 
+        Array allTypes = Enum.GetValues(typeof(NormalItem.eNormalType));
+        foreach (NormalItem.eNormalType itemType in allTypes)
+        {
+            int count;
+            if (totalTypeCounts.TryGetValue(itemType, out count) == false || count == 0)
+            {
+                errors.Add(string.Format("Type {0} is missing. The initial board must contain all fish types.", (int)itemType + 1));
+            }
+        }
+
         foreach (KeyValuePair<NormalItem.eNormalType, int> pair in totalTypeCounts)
         {
             if (pair.Value % 3 != 0)

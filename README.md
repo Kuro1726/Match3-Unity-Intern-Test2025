@@ -14,9 +14,19 @@
 - Item positions and layer indices are clamped to the valid board area when edited.
 - Adding an item to a full layer is rejected instead of placing it outside the board.
 - Existing out-of-bounds items are reported and can be removed with Remove Items Outside Board.
+- Each runtime item now owns a visual copy of cellBackground, so the item and background move, compact, and disappear as one tile.
+- Logical board cell renderers are hidden while their colliders remain available for input and blocking checks.
+- ItemBackgroundScale and ItemBackgroundOpacity in Game Settings control the tile background thickness and visibility; the default scale is 1.08.
 - Same-layer items use a one-cell footprint; positions less than one unit apart on both axes are treated as overlapping and rejected.
 - Assign and asset saving are blocked while the layout has validation errors.
 - Every Type total across the full board must be divisible by three; per-layer Type counts remain divisible by three for the current Autoplay strategy.
+- A valid saved layout must contain all seven fish Types; with divisible-by-three counts this means at least three items of every Type.
+- Full-layout generation cycles Type groups across layers so all seven Types are included whenever the board has at least 21 playable items.
+- Board-to-tray movement uses a DOTween DOMove plus punch-scale animation on the complete tile root.
+- Matching tiles clear with DOTween by scaling the item and its background fully to zero before destruction.
+- Game Settings exposes ItemMoveDuration, ItemMoveEase, ItemMovePunchScale, ItemMovePunchVibrato, ItemMovePunchElasticity, ItemClearDuration, and ItemClearEase.
+- The default board-to-tray movement uses 0.45 seconds with OutBounce for a clearer downward landing.
+- Every Game Settings field now includes an Inspector hover tooltip describing its runtime effect and recommended intent.
 - Validation reports duplicate positions, negative layers, off-grid positions, and layer/type counts that are not divisible by three.
 - Runtime blocking is calculated from the authored positions: an overlapping item on any higher layer blocks the lower item.
 - If Game Settings has no valid BoardLayoutSO assigned, the previous generated-board implementation remains available as a fallback.

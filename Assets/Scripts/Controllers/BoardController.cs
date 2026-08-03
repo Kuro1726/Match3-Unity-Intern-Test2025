@@ -11,8 +11,6 @@ public class BoardController : MonoBehaviour
     public event Action<int, int, int> OnProgressChanged = delegate { };
     public bool IsBusy { get; private set; }
 
-    private const float MoveDuration = 0.25f;
-    private const float MatchDelay = 0.12f;
     private const int RequiredMatchSize = 3;
     private const float AutoActionDelay = 0.5f;
     private Board m_board;
@@ -22,6 +20,8 @@ public class BoardController : MonoBehaviour
     private bool m_gameOver;
     private bool m_operationInProgress;
     private bool m_autoPlaying;
+    private float m_moveDuration;
+    private float m_clearDuration;
 
     public void StartGame(GameManager gameManager, GameSettings gameSettings)
     {
@@ -33,7 +33,9 @@ public class BoardController : MonoBehaviour
 
         int trayCapacity = Mathf.Max(RequiredMatchSize, gameSettings.BottomCellCount);
         float trayY = -gameSettings.BoardSizeY * 0.5f - 1f;
-        m_bottomTray = new BottomTray(transform, trayCapacity, RequiredMatchSize, trayY);
+        m_moveDuration = Mathf.Max(0.05f, gameSettings.ItemMoveDuration);
+        m_clearDuration = Mathf.Max(0.05f, gameSettings.ItemClearDuration);
+        m_bottomTray = new BottomTray(transform, trayCapacity, RequiredMatchSize, trayY, gameSettings);
         IsBusy = false;
         NotifyProgressChanged();
     }
@@ -86,7 +88,7 @@ public class BoardController : MonoBehaviour
         m_operationInProgress = true;
         IsBusy = true;
         OnMoveEvent();
-        m_bottomTray.Add(item, MoveDuration, () => StartCoroutine(ResolveMoveCoroutine()));
+        m_bottomTray.Add(item, m_moveDuration, () => StartCoroutine(ResolveMoveCoroutine()));
         NotifyProgressChanged();
     }
 
@@ -148,9 +150,9 @@ public class BoardController : MonoBehaviour
         {
             m_bottomTray.ClearMatch(match);
             NotifyProgressChanged();
-            yield return new WaitForSeconds(MatchDelay);
-            m_bottomTray.Compact(MoveDuration);
-            yield return new WaitForSeconds(MoveDuration);
+            yield return new WaitForSeconds(m_clearDuration);
+            m_bottomTray.Compact(m_moveDuration);
+            yield return new WaitForSeconds(m_moveDuration);
             NotifyProgressChanged();
         }
 
@@ -201,14 +203,26 @@ internal class BottomTray
 {
     private readonly List<Cell> m_cells = new List<Cell>();
     private readonly List<Item> m_items = new List<Item>();
+    private readonly Ease m_moveEase;
+    private readonly float m_movePunchScale;
+    private readonly int m_movePunchVibrato;
+    private readonly float m_movePunchElasticity;
+    private readonly float m_clearDuration;
+    private readonly Ease m_clearEase;
     public int Count => m_items.Count;
     public int Capacity => m_cells.Count;
     public int MatchSize { get; private set; }
     public bool IsFull => Count >= Capacity;
 
-    public BottomTray(Transform root, int capacity, int matchSize, float yPosition)
+    public BottomTray(Transform root, int capacity, int matchSize, float yPosition, GameSettings settings)
     {
         MatchSize = Mathf.Max(3, matchSize);
+        m_moveEase = settings.ItemMoveEase;
+        m_movePunchScale = Mathf.Max(0f, settings.ItemMovePunchScale);
+        m_movePunchVibrato = Mathf.Max(1, settings.ItemMovePunchVibrato);
+        m_movePunchElasticity = Mathf.Clamp01(settings.ItemMovePunchElasticity);
+        m_clearDuration = Mathf.Max(0.05f, settings.ItemClearDuration);
+        m_clearEase = settings.ItemClearEase;
         GameObject prefab = Resources.Load<GameObject>(Constants.PREFAB_CELL_BACKGROUND);
         float startX = -capacity * 0.5f + 0.5f;
         for (int i = 0; i < capacity; i++)
@@ -227,9 +241,13 @@ internal class BottomTray
         destination.Assign(item);
         item.SetSortingLayerHigher();
         item.View.DOKill();
-        item.View.DOMove(destination.transform.position, duration)
-            .SetEase(Ease.OutQuad)
-            .OnComplete(() =>
+        Sequence moveSequence = DOTween.Sequence();
+        moveSequence.Join(item.View.DOMove(destination.transform.position, duration).SetEase(m_moveEase));
+        if (m_movePunchScale > 0f)
+        {
+            moveSequence.Join(item.View.DOPunchScale(Vector3.one * m_movePunchScale, duration, m_movePunchVibrato, m_movePunchElasticity));
+        }
+        moveSequence.OnComplete(() =>
             {
                 item.SetSortingLayerLower();
                 if (onComplete != null) onComplete();
@@ -250,7 +268,7 @@ internal class BottomTray
         {
             if (item.Cell != null) item.Cell.Free();
             m_items.Remove(item);
-            item.ExplodeView();
+            item.ExplodeView(m_clearDuration, m_clearEase);
         }
     }
     public void Compact(float duration)

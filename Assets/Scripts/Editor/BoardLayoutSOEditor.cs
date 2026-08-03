@@ -278,7 +278,8 @@ public class BoardLayoutSOEditor : Editor
         Undo.RecordObject(layout, "Add board layer");
         Undo.RecordObject(settings, "Increase board layer count");
         serializedObject.Update();
-        AppendGeneratedLayer(settings, newLayer);
+        int typeCursor = GetGenerationTypeCursor();
+        AppendGeneratedLayer(settings, newLayer, ref typeCursor);
         serializedObject.ApplyModifiedProperties();
         settings.BoardLayerCount = Mathf.Max(settings.BoardLayerCount, newLayer + 1);
         EditorUtility.SetDirty(layout);
@@ -343,16 +344,17 @@ public class BoardLayoutSOEditor : Editor
         Undo.RecordObject(layout, "Generate board layout");
         serializedObject.Update();
         m_items.ClearArray();
+        int typeCursor = 0;
         for (int layer = 0; layer < Mathf.Max(1, settings.BoardLayerCount); layer++)
         {
-            if (AppendGeneratedLayer(settings, layer) == false) break;
+            if (AppendGeneratedLayer(settings, layer, ref typeCursor) == false) break;
         }
         serializedObject.ApplyModifiedProperties();
         EditorUtility.SetDirty(layout);
         m_layerFilter = -1;
     }
 
-    private bool AppendGeneratedLayer(GameSettings settings, int layer)
+    private bool AppendGeneratedLayer(GameSettings settings, int layer, ref int typeCursor)
     {
         int width = settings.BoardSizeX - layer;
         int height = settings.BoardSizeY - layer;
@@ -360,7 +362,7 @@ public class BoardLayoutSOEditor : Editor
         int playableCount = 3 * (width * height / 3);
         if (playableCount < 3) return false;
 
-        List<NormalItem.eNormalType> types = CreateBalancedTypes(playableCount);
+        List<NormalItem.eNormalType> types = CreateBalancedTypes(playableCount, ref typeCursor);
         for (int index = 0; index < playableCount; index++)
         {
             int itemIndex = m_items.arraySize;
@@ -375,14 +377,15 @@ public class BoardLayoutSOEditor : Editor
         return true;
     }
 
-    private static List<NormalItem.eNormalType> CreateBalancedTypes(int itemCount)
+    private static List<NormalItem.eNormalType> CreateBalancedTypes(int itemCount, ref int typeCursor)
     {
         Array values = Enum.GetValues(typeof(NormalItem.eNormalType));
         List<NormalItem.eNormalType> types = new List<NormalItem.eNormalType>(itemCount);
         for (int group = 0; group < itemCount / 3; group++)
         {
-            NormalItem.eNormalType type = (NormalItem.eNormalType)values.GetValue(group % values.Length);
+            NormalItem.eNormalType type = (NormalItem.eNormalType)values.GetValue(typeCursor % values.Length);
             types.Add(type); types.Add(type); types.Add(type);
+            typeCursor++;
         }
         for (int i = types.Count - 1; i > 0; i--)
         {
@@ -390,6 +393,12 @@ public class BoardLayoutSOEditor : Editor
             NormalItem.eNormalType temp = types[i]; types[i] = types[randomIndex]; types[randomIndex] = temp;
         }
         return types;
+    }
+
+    private int GetGenerationTypeCursor()
+    {
+        int typeCount = Enum.GetValues(typeof(NormalItem.eNormalType)).Length;
+        return typeCount == 0 ? 0 : (m_items.arraySize / 3) % typeCount;
     }
 
     private static void AssignToGameSettings(BoardLayoutSO layout)

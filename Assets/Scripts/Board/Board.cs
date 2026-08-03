@@ -9,11 +9,14 @@ public class Board
     private readonly int m_matchSize = 3;
     private readonly int m_layerCount;
     private readonly BoardLayoutSO m_layout;
+    private readonly float m_itemBackgroundScale;
+    private readonly float m_itemBackgroundOpacity;
     private readonly List<Cell[,]> m_layers = new List<Cell[,]>();
     private readonly List<Cell> m_cells = new List<Cell>();
     private readonly Dictionary<Cell, NormalItem.eNormalType> m_layoutItemTypes = new Dictionary<Cell, NormalItem.eNormalType>();
     private readonly Transform m_root;
     private int m_remainingItemCount;
+    private int m_generationTypeCursor;
 
     public int RemainingItemCount => m_remainingItemCount;
 
@@ -24,6 +27,8 @@ public class Board
         m_boardSizeY = gameSettings.BoardSizeY;
         m_layerCount = Mathf.Max(1, gameSettings.BoardLayerCount);
         m_layout = gameSettings.BoardLayout;
+        m_itemBackgroundScale = gameSettings.ItemBackgroundScale;
+        m_itemBackgroundOpacity = gameSettings.ItemBackgroundOpacity;
         if (m_layout != null && m_layout.HasItems) CreateBoardFromLayout();
         else CreateGeneratedBoard();
     }
@@ -98,7 +103,11 @@ public class Board
         Cell cell = view.GetComponent<Cell>();
         cell.Setup(x, y, layer);
         SpriteRenderer renderer = view.GetComponent<SpriteRenderer>();
-        if (renderer) renderer.sortingOrder = layer * 10;
+        if (renderer)
+        {
+            renderer.sortingOrder = layer * 10;
+            renderer.enabled = false;
+        }
         m_cells.Add(cell);
         return cell;
     }
@@ -126,6 +135,7 @@ public class Board
         }
         else
         {
+            m_generationTypeCursor = 0;
             foreach (Cell[,] layerCells in m_layers)
             {
                 FillLayer(layerCells);
@@ -163,6 +173,7 @@ public class Board
         NormalItem item = new NormalItem();
         item.SetType(itemType);
         item.SetView();
+        item.ConfigureBackground(m_itemBackgroundScale, m_itemBackgroundOpacity);
         item.SetViewRoot(m_root);
         cell.Assign(item);
         cell.ApplyItemPosition(false);
@@ -175,9 +186,10 @@ public class Board
         int groupCount = itemCount / m_matchSize;
         for (int group = 0; group < groupCount; group++)
         {
-            int typeIndex = group - values.Length * (group / values.Length);
+            int typeIndex = m_generationTypeCursor % values.Length;
             NormalItem.eNormalType type = (NormalItem.eNormalType)values.GetValue(typeIndex);
             for (int i = 0; i < m_matchSize; i++) result.Add(type);
+            m_generationTypeCursor++;
         }
 
         for (int i = result.Count - 1; i > 0; i--)

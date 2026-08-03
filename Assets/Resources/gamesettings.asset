@@ -18,6 +18,15 @@ MonoBehaviour:
   BoardLayerCount: 4
   MatchesMin: 3
   BottomCellCount: 5
+  ItemBackgroundScale: 1.08
+  ItemBackgroundOpacity: 1
+  ItemMoveDuration: 0.45
+  ItemMoveEase: 30
+  ItemMovePunchScale: 0.14
+  ItemMovePunchVibrato: 2
+  ItemMovePunchElasticity: 0.55
+  ItemClearDuration: 0.18
+  ItemClearEase: 26
   LevelMoves: 16
   LevelTime: 30
   TimeForHint: 5
