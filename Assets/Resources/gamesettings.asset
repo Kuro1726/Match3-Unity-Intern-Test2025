@@ -15,7 +15,7 @@ MonoBehaviour:
   BoardSizeX: 4
   BoardSizeY: 6
   MatchesMin: 3
-  BottomCellCount: 7
+  BottomCellCount: 5
   LevelMoves: 16
   LevelTime: 30
   TimeForHint: 5

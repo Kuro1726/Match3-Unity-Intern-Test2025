@@ -14,12 +14,14 @@ public class BoardController : MonoBehaviour
     private const float MoveDuration = 0.25f;
     private const float MatchDelay = 0.12f;
     private const int RequiredMatchSize = 3;
+    private const float AutoActionDelay = 0.5f;
     private Board m_board;
     private BottomTray m_bottomTray;
     private GameManager m_gameManager;
     private Camera m_camera;
     private bool m_gameOver;
     private bool m_operationInProgress;
+    private bool m_autoPlaying;
 
     public void StartGame(GameManager gameManager, GameSettings gameSettings)
     {
@@ -47,6 +49,7 @@ public class BoardController : MonoBehaviour
     }
     public void Update()
     {
+        if (m_autoPlaying) return;
         if (m_gameOver || IsBusy || m_camera == null) return;
         if (Input.GetMouseButtonDown(0) == false) return;
 
@@ -54,6 +57,20 @@ public class BoardController : MonoBehaviour
         RaycastHit2D hit = Physics2D.Raycast(worldPosition, Vector2.zero);
         if (hit.collider == null) return;
         TryMoveItemToTray(hit.collider.GetComponent<Cell>());
+    }
+
+    public void StartAutoPlay(GameManager.ePlayMode mode)
+    {
+        if (mode == GameManager.ePlayMode.MANUAL) return;
+        m_autoPlaying = true;
+        if (mode == GameManager.ePlayMode.AUTO_WIN)
+        {
+            StartCoroutine(AutoWinCoroutine());
+        }
+        else
+        {
+            StartCoroutine(AutoLoseCoroutine());
+        }
     }
     private void TryMoveItemToTray(Cell selectedCell)
     {
@@ -67,6 +84,59 @@ public class BoardController : MonoBehaviour
         OnMoveEvent();
         m_bottomTray.Add(item, MoveDuration, () => StartCoroutine(ResolveMoveCoroutine()));
         NotifyProgressChanged();
+    }
+
+    private IEnumerator AutoWinCoroutine()
+    {
+        int itemsLeftInGroup = 0;
+        NormalItem.eNormalType targetType = default(NormalItem.eNormalType);
+        yield return new WaitForSeconds(AutoActionDelay);
+
+        while (m_gameOver == false && m_board.RemainingItemCount > 0)
+        {
+            while (m_gameOver == false && (IsBusy || m_gameManager.State != GameManager.eStateGame.GAME_STARTED))
+            {
+                yield return null;
+            }
+            if (m_gameOver) yield break;
+
+            if (itemsLeftInGroup == 0)
+            {
+                Cell firstCell = m_board.FindFirstOccupiedCell();
+                if (firstCell == null) yield break;
+                targetType = ((NormalItem)firstCell.Item).ItemType;
+                itemsLeftInGroup = RequiredMatchSize;
+            }
+
+            Cell targetCell = m_board.FindCellOfType(targetType);
+            if (targetCell == null) yield break;
+            TryMoveItemToTray(targetCell);
+            itemsLeftInGroup--;
+            yield return new WaitForSeconds(AutoActionDelay);
+        }
+    }
+
+    private IEnumerator AutoLoseCoroutine()
+    {
+        List<Cell> plan = m_board.BuildAutoLosePlan(m_bottomTray.Capacity, RequiredMatchSize - 1);
+        if (plan.Count < m_bottomTray.Capacity)
+        {
+            FinishGame(GameManager.eGameResult.LOSE);
+            yield break;
+        }
+
+        yield return new WaitForSeconds(AutoActionDelay);
+        foreach (Cell targetCell in plan)
+        {
+            while (m_gameOver == false && (IsBusy || m_gameManager.State != GameManager.eStateGame.GAME_STARTED))
+            {
+                yield return null;
+            }
+            if (m_gameOver) yield break;
+
+            TryMoveItemToTray(targetCell);
+            yield return new WaitForSeconds(AutoActionDelay);
+        }
     }
     private IEnumerator ResolveMoveCoroutine()
     {

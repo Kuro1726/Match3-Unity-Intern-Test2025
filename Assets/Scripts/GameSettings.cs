@@ -10,7 +10,7 @@ public class GameSettings : ScriptableObject
 
     public int MatchesMin = 3;
 
-    public int BottomCellCount = 7;
+    public int BottomCellCount = 5;
 
     public int LevelMoves = 16;
 

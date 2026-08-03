@@ -96,6 +96,51 @@ public class Board
         return true;
     }
 
+    public Cell FindFirstOccupiedCell()
+    {
+        for (int y = 0; y < m_boardSizeY; y++)
+        {
+            for (int x = 0; x < m_boardSizeX; x++)
+            {
+                if (m_cells[x, y].IsEmpty == false) return m_cells[x, y];
+            }
+        }
+        return null;
+    }
+
+    public Cell FindCellOfType(NormalItem.eNormalType itemType)
+    {
+        for (int y = 0; y < m_boardSizeY; y++)
+        {
+            for (int x = 0; x < m_boardSizeX; x++)
+            {
+                NormalItem item = m_cells[x, y].Item as NormalItem;
+                if (item != null && item.ItemType == itemType) return m_cells[x, y];
+            }
+        }
+        return null;
+    }
+
+    public List<Cell> BuildAutoLosePlan(int targetCount, int maxItemsPerType)
+    {
+        List<Cell> result = new List<Cell>(targetCount);
+        Dictionary<NormalItem.eNormalType, int> counts = new Dictionary<NormalItem.eNormalType, int>();
+        for (int y = 0; y < m_boardSizeY && result.Count < targetCount; y++)
+        {
+            for (int x = 0; x < m_boardSizeX && result.Count < targetCount; x++)
+            {
+                NormalItem item = m_cells[x, y].Item as NormalItem;
+                if (item == null) continue;
+                int count;
+                counts.TryGetValue(item.ItemType, out count);
+                if (count >= maxItemsPerType) continue;
+                counts[item.ItemType] = count + 1;
+                result.Add(m_cells[x, y]);
+            }
+        }
+        return result;
+    }
+
     private bool Contains(Cell target)
     {
         if (target == null) return false;

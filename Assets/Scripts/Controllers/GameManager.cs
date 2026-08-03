@@ -30,6 +30,13 @@ public class GameManager : MonoBehaviour
         LOSE
     }
 
+    public enum ePlayMode
+    {
+        MANUAL,
+        AUTO_WIN,
+        AUTO_LOSE
+    }
+
     private eStateGame m_state;
     public eStateGame State
     {
@@ -46,6 +53,7 @@ public class GameManager : MonoBehaviour
     private GameSettings m_gameSettings;
 
     public eGameResult LastResult { get; private set; }
+    public ePlayMode CurrentPlayMode { get; private set; }
 
 
     private BoardController m_boardController;
@@ -90,13 +98,20 @@ public class GameManager : MonoBehaviour
 
     public void LoadLevel(eLevelMode mode)
     {
+        LoadLevel(ePlayMode.MANUAL);
+    }
+
+    public void LoadLevel(ePlayMode mode)
+    {
         ClearLevel();
         LastResult = eGameResult.NONE;
+        CurrentPlayMode = mode;
         m_boardController = new GameObject("BoardController").AddComponent<BoardController>();
         m_boardController.OnProgressChanged += OnProgressChanged;
         m_boardController.StartGame(this, m_gameSettings);
 
         State = eStateGame.GAME_STARTED;
+        m_boardController.StartAutoPlay(mode);
     }
 
     public void GameOver()
