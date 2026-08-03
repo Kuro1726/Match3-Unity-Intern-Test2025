@@ -98,6 +98,7 @@ public class Item
     {
         if (View)
         {
+            View.DOKill();
             View.DOScale(0.1f, 0.1f).OnComplete(
                 () =>
                 {
@@ -132,6 +133,7 @@ public class Item
 
         if (View)
         {
+            View.DOKill();
             GameObject.Destroy(View.gameObject);
             View = null;
         }

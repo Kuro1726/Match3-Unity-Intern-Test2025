@@ -67,8 +67,24 @@ public class UIMainManager : MonoBehaviour
                 ShowMenu<UIPanelPause>();
                 break;
             case GameManager.eStateGame.GAME_OVER:
-                ShowMenu<UIPanelGameOver>();
+                ShowResultMenu(m_gameManager.LastResult == GameManager.eGameResult.WIN);
                 break;
+        }
+    }
+
+    private void ShowResultMenu(bool isWin)
+    {
+        for (int i = 0; i < m_menuList.Length; i++)
+        {
+            UIPanelGameOver resultPanel = m_menuList[i] as UIPanelGameOver;
+            if (resultPanel != null && resultPanel.IsWinPanel == isWin)
+            {
+                resultPanel.Show();
+            }
+            else
+            {
+                m_menuList[i].Hide();
+            }
         }
     }
 
@@ -97,6 +113,15 @@ public class UIMainManager : MonoBehaviour
         }
 
         return null;
+    }
+
+    internal void UpdateGameProgress(int trayCount, int trayCapacity, int remainingItems)
+    {
+        UIPanelGame game = m_menuList.Where(x => x is UIPanelGame).Cast<UIPanelGame>().FirstOrDefault();
+        if (game)
+        {
+            game.UpdateProgress(trayCount, trayCapacity, remainingItems);
+        }
     }
 
     internal void ShowPauseMenu()

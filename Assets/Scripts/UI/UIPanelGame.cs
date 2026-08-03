@@ -36,4 +36,12 @@ public class UIPanelGame : MonoBehaviour,IMenu
     {
         this.gameObject.SetActive(false);
     }
+
+    public void UpdateProgress(int trayCount, int trayCapacity, int remainingItems)
+    {
+        if (LevelConditionView != null)
+        {
+            LevelConditionView.text = string.Format("TRAY: {0}/{1}{3}ITEMS: {2}", trayCount, trayCapacity, remainingItems, Environment.NewLine);
+        }
+    }
 }

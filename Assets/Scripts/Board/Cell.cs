@@ -35,6 +35,11 @@ public class Cell : MonoBehaviour
 
     public void Free()
     {
+        if (Item != null)
+        {
+            Item.SetCell(null);
+        }
+
         Item = null;
     }
 

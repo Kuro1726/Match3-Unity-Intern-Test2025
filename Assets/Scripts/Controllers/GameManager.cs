@@ -23,6 +23,13 @@ public class GameManager : MonoBehaviour
         GAME_OVER,
     }
 
+    public enum eGameResult
+    {
+        NONE,
+        WIN,
+        LOSE
+    }
+
     private eStateGame m_state;
     public eStateGame State
     {
@@ -38,12 +45,12 @@ public class GameManager : MonoBehaviour
 
     private GameSettings m_gameSettings;
 
+    public eGameResult LastResult { get; private set; }
+
 
     private BoardController m_boardController;
 
     private UIMainManager m_uiMenu;
-
-    private LevelCondition m_levelCondition;
 
     private void Awake()
     {
@@ -83,34 +90,38 @@ public class GameManager : MonoBehaviour
 
     public void LoadLevel(eLevelMode mode)
     {
+        ClearLevel();
+        LastResult = eGameResult.NONE;
         m_boardController = new GameObject("BoardController").AddComponent<BoardController>();
+        m_boardController.OnProgressChanged += OnProgressChanged;
         m_boardController.StartGame(this, m_gameSettings);
-
-        if (mode == eLevelMode.MOVES)
-        {
-            m_levelCondition = this.gameObject.AddComponent<LevelMoves>();
-            m_levelCondition.Setup(m_gameSettings.LevelMoves, m_uiMenu.GetLevelConditionView(), m_boardController);
-        }
-        else if (mode == eLevelMode.TIMER)
-        {
-            m_levelCondition = this.gameObject.AddComponent<LevelTime>();
-            m_levelCondition.Setup(m_gameSettings.LevelMoves, m_uiMenu.GetLevelConditionView(), this);
-        }
-
-        m_levelCondition.ConditionCompleteEvent += GameOver;
 
         State = eStateGame.GAME_STARTED;
     }
 
     public void GameOver()
     {
+        CompleteGame(eGameResult.LOSE);
+    }
+
+    public void CompleteGame(eGameResult result)
+    {
+        if (State == eStateGame.GAME_OVER) return;
+        if (LastResult != eGameResult.NONE) return;
+        LastResult = result;
         StartCoroutine(WaitBoardController());
+    }
+
+    private void OnProgressChanged(int trayCount, int trayCapacity, int remainingItems)
+    {
+        m_uiMenu.UpdateGameProgress(trayCount, trayCapacity, remainingItems);
     }
 
     internal void ClearLevel()
     {
         if (m_boardController)
         {
+            m_boardController.OnProgressChanged -= OnProgressChanged;
             m_boardController.Clear();
             Destroy(m_boardController.gameObject);
             m_boardController = null;
@@ -127,13 +138,5 @@ public class GameManager : MonoBehaviour
         yield return new WaitForSeconds(1f);
 
         State = eStateGame.GAME_OVER;
-
-        if (m_levelCondition != null)
-        {
-            m_levelCondition.ConditionCompleteEvent -= GameOver;
-
-            Destroy(m_levelCondition);
-            m_levelCondition = null;
-        }
     }
 }

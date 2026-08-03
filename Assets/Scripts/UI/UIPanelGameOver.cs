@@ -9,6 +9,8 @@ public class UIPanelGameOver : MonoBehaviour, IMenu
 
     private UIMainManager m_mngr;
 
+    public bool IsWinPanel => gameObject.name == "PanelWin";
+
     private void Awake()
     {
         btnClose.onClick.AddListener(OnClickClose);

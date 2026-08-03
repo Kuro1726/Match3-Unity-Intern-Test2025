@@ -1,4 +1,4 @@
-﻿using DG.Tweening;
+using DG.Tweening;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -8,299 +8,199 @@ using UnityEngine;
 public class BoardController : MonoBehaviour
 {
     public event Action OnMoveEvent = delegate { };
-
+    public event Action<int, int, int> OnProgressChanged = delegate { };
     public bool IsBusy { get; private set; }
 
+    private const float MoveDuration = 0.25f;
+    private const float MatchDelay = 0.12f;
+    private const int RequiredMatchSize = 3;
     private Board m_board;
-
+    private BottomTray m_bottomTray;
     private GameManager m_gameManager;
-
-    private bool m_isDragging;
-
-    private Camera m_cam;
-
-    private Collider2D m_hitCollider;
-
-    private GameSettings m_gameSettings;
-
-    private List<Cell> m_potentialMatch;
-
-    private float m_timeAfterFill;
-
-    private bool m_hintIsShown;
-
+    private Camera m_camera;
     private bool m_gameOver;
+    private bool m_operationInProgress;
 
     public void StartGame(GameManager gameManager, GameSettings gameSettings)
     {
         m_gameManager = gameManager;
-
-        m_gameSettings = gameSettings;
-
         m_gameManager.StateChangedAction += OnGameStateChange;
-
-        m_cam = Camera.main;
-
-        m_board = new Board(this.transform, gameSettings);
-
-        Fill();
-    }
-
-    private void Fill()
-    {
+        m_camera = Camera.main;
+        m_board = new Board(transform, gameSettings);
         m_board.Fill();
-        FindMatchesAndCollapse();
-    }
 
+        int trayCapacity = Mathf.Max(RequiredMatchSize, gameSettings.BottomCellCount);
+        float trayY = -gameSettings.BoardSizeY * 0.5f - 1f;
+        m_bottomTray = new BottomTray(transform, trayCapacity, RequiredMatchSize, trayY);
+        IsBusy = false;
+        NotifyProgressChanged();
+    }
     private void OnGameStateChange(GameManager.eStateGame state)
     {
-        switch (state)
+        if (state == GameManager.eStateGame.GAME_STARTED) IsBusy = m_operationInProgress;
+        if (state == GameManager.eStateGame.PAUSE) IsBusy = true;
+        if (state == GameManager.eStateGame.GAME_OVER)
         {
-            case GameManager.eStateGame.GAME_STARTED:
-                IsBusy = false;
-                break;
-            case GameManager.eStateGame.PAUSE:
-                IsBusy = true;
-                break;
-            case GameManager.eStateGame.GAME_OVER:
-                m_gameOver = true;
-                StopHints();
-                break;
+            m_gameOver = true;
+            IsBusy = true;
         }
     }
-
-
     public void Update()
     {
-        if (m_gameOver) return;
-        if (IsBusy) return;
+        if (m_gameOver || IsBusy || m_camera == null) return;
+        if (Input.GetMouseButtonDown(0) == false) return;
 
-        if (!m_hintIsShown)
+        Vector2 worldPosition = m_camera.ScreenToWorldPoint(Input.mousePosition);
+        RaycastHit2D hit = Physics2D.Raycast(worldPosition, Vector2.zero);
+        if (hit.collider == null) return;
+        TryMoveItemToTray(hit.collider.GetComponent<Cell>());
+    }
+    private void TryMoveItemToTray(Cell selectedCell)
+    {
+        if (selectedCell == null || m_bottomTray.IsFull) return;
+
+        Item item;
+        if (m_board.TryTakeItem(selectedCell, out item) == false) return;
+
+        m_operationInProgress = true;
+        IsBusy = true;
+        OnMoveEvent();
+        m_bottomTray.Add(item, MoveDuration, () => StartCoroutine(ResolveMoveCoroutine()));
+        NotifyProgressChanged();
+    }
+    private IEnumerator ResolveMoveCoroutine()
+    {
+        List<Item> match = m_bottomTray.FindMatch();
+        if (match.Count == m_bottomTray.MatchSize)
         {
-            m_timeAfterFill += Time.deltaTime;
-            if (m_timeAfterFill > m_gameSettings.TimeForHint)
-            {
-                m_timeAfterFill = 0f;
-                ShowHint();
-            }
+            m_bottomTray.ClearMatch(match);
+            NotifyProgressChanged();
+            yield return new WaitForSeconds(MatchDelay);
+            m_bottomTray.Compact(MoveDuration);
+            yield return new WaitForSeconds(MoveDuration);
+            NotifyProgressChanged();
         }
 
-        if (Input.GetMouseButtonDown(0))
+        if (m_board.RemainingItemCount == 0 && m_bottomTray.Count == 0)
         {
-            var hit = Physics2D.Raycast(m_cam.ScreenToWorldPoint(Input.mousePosition), Vector2.zero);
-            if (hit.collider != null)
-            {
-                m_isDragging = true;
-                m_hitCollider = hit.collider;
-            }
+            FinishGame(GameManager.eGameResult.WIN);
+            yield break;
         }
-
-        if (Input.GetMouseButtonUp(0))
+        if (m_bottomTray.IsFull)
         {
-            ResetRayCast();
+            FinishGame(GameManager.eGameResult.LOSE);
+            yield break;
         }
-
-        if (Input.GetMouseButton(0) && m_isDragging)
-        {
-            var hit = Physics2D.Raycast(m_cam.ScreenToWorldPoint(Input.mousePosition), Vector2.zero);
-            if (hit.collider != null)
-            {
-                if (m_hitCollider != null && m_hitCollider != hit.collider)
-                {
-                    StopHints();
-
-                    Cell c1 = m_hitCollider.GetComponent<Cell>();
-                    Cell c2 = hit.collider.GetComponent<Cell>();
-                    if (AreItemsNeighbor(c1, c2))
-                    {
-                        IsBusy = true;
-                        SetSortingLayer(c1, c2);
-                        m_board.Swap(c1, c2, () =>
-                        {
-                            FindMatchesAndCollapse(c1, c2);
-                        });
-
-                        ResetRayCast();
-                    }
-                }
-            }
-            else
-            {
-                ResetRayCast();
-            }
-        }
+        m_operationInProgress = false;
+        IsBusy = false;
+    }
+    private void FinishGame(GameManager.eGameResult result)
+    {
+        m_operationInProgress = false;
+        IsBusy = false;
+        m_gameOver = true;
+        m_gameManager.CompleteGame(result);
     }
 
-    private void ResetRayCast()
+    private void NotifyProgressChanged()
     {
-        m_isDragging = false;
-        m_hitCollider = null;
-    }
-
-    private void FindMatchesAndCollapse(Cell cell1, Cell cell2)
-    {
-        if (cell1.Item is BonusItem)
-        {
-            cell1.ExplodeItem();
-            StartCoroutine(ShiftDownItemsCoroutine());
-        }
-        else if (cell2.Item is BonusItem)
-        {
-            cell2.ExplodeItem();
-            StartCoroutine(ShiftDownItemsCoroutine());
-        }
-        else
-        {
-            List<Cell> cells1 = GetMatches(cell1);
-            List<Cell> cells2 = GetMatches(cell2);
-
-            List<Cell> matches = new List<Cell>();
-            matches.AddRange(cells1);
-            matches.AddRange(cells2);
-            matches = matches.Distinct().ToList();
-
-            if (matches.Count < m_gameSettings.MatchesMin)
-            {
-                m_board.Swap(cell1, cell2, () =>
-                {
-                    IsBusy = false;
-                });
-            }
-            else
-            {
-                OnMoveEvent();
-
-                CollapseMatches(matches, cell2);
-            }
-        }
-    }
-
-    private void FindMatchesAndCollapse()
-    {
-        List<Cell> matches = m_board.FindFirstMatch();
-
-        if (matches.Count > 0)
-        {
-            CollapseMatches(matches, null);
-        }
-        else
-        {
-            m_potentialMatch = m_board.GetPotentialMatches();
-            if (m_potentialMatch.Count > 0)
-            {
-                IsBusy = false;
-
-                m_timeAfterFill = 0f;
-            }
-            else
-            {
-                //StartCoroutine(RefillBoardCoroutine());
-                StartCoroutine(ShuffleBoardCoroutine());
-            }
-        }
-    }
-
-    private List<Cell> GetMatches(Cell cell)
-    {
-        List<Cell> listHor = m_board.GetHorizontalMatches(cell);
-        if (listHor.Count < m_gameSettings.MatchesMin)
-        {
-            listHor.Clear();
-        }
-
-        List<Cell> listVert = m_board.GetVerticalMatches(cell);
-        if (listVert.Count < m_gameSettings.MatchesMin)
-        {
-            listVert.Clear();
-        }
-
-        return listHor.Concat(listVert).Distinct().ToList();
-    }
-
-    private void CollapseMatches(List<Cell> matches, Cell cellEnd)
-    {
-        for (int i = 0; i < matches.Count; i++)
-        {
-            matches[i].ExplodeItem();
-        }
-
-        if(matches.Count > m_gameSettings.MatchesMin)
-        {
-            m_board.ConvertNormalToBonus(matches, cellEnd);
-        }
-
-        StartCoroutine(ShiftDownItemsCoroutine());
-    }
-
-    private IEnumerator ShiftDownItemsCoroutine()
-    {
-        m_board.ShiftDownItems();
-
-        yield return new WaitForSeconds(0.2f);
-
-        m_board.FillGapsWithNewItems();
-
-        yield return new WaitForSeconds(0.2f);
-
-        FindMatchesAndCollapse();
-    }
-
-    private IEnumerator RefillBoardCoroutine()
-    {
-        m_board.ExplodeAllItems();
-
-        yield return new WaitForSeconds(0.2f);
-
-        m_board.Fill();
-
-        yield return new WaitForSeconds(0.2f);
-
-        FindMatchesAndCollapse();
-    }
-
-    private IEnumerator ShuffleBoardCoroutine()
-    {
-        m_board.Shuffle();
-
-        yield return new WaitForSeconds(0.3f);
-
-        FindMatchesAndCollapse();
-    }
-
-
-    private void SetSortingLayer(Cell cell1, Cell cell2)
-    {
-        if (cell1.Item != null) cell1.Item.SetSortingLayerHigher();
-        if (cell2.Item != null) cell2.Item.SetSortingLayerLower();
-    }
-
-    private bool AreItemsNeighbor(Cell cell1, Cell cell2)
-    {
-        return cell1.IsNeighbour(cell2);
+        OnProgressChanged(m_bottomTray.Count, m_bottomTray.Capacity, m_board.RemainingItemCount);
     }
 
     internal void Clear()
     {
-        m_board.Clear();
-    }
-
-    private void ShowHint()
-    {
-        m_hintIsShown = true;
-        foreach (var cell in m_potentialMatch)
+        StopAllCoroutines();
+        if (m_gameManager != null) m_gameManager.StateChangedAction -= OnGameStateChange;
+        if (m_bottomTray != null)
         {
-            cell.AnimateItemForHint();
+            m_bottomTray.Clear();
+            m_bottomTray = null;
+        }
+        if (m_board != null)
+        {
+            m_board.Clear();
+            m_board = null;
         }
     }
+}
 
-    private void StopHints()
+internal class BottomTray
+{
+    private readonly List<Cell> m_cells = new List<Cell>();
+    private readonly List<Item> m_items = new List<Item>();
+    public int Count => m_items.Count;
+    public int Capacity => m_cells.Count;
+    public int MatchSize { get; private set; }
+    public bool IsFull => Count >= Capacity;
+
+    public BottomTray(Transform root, int capacity, int matchSize, float yPosition)
     {
-        m_hintIsShown = false;
-        foreach (var cell in m_potentialMatch)
+        MatchSize = Mathf.Max(3, matchSize);
+        GameObject prefab = Resources.Load<GameObject>(Constants.PREFAB_CELL_BACKGROUND);
+        float startX = -capacity * 0.5f + 0.5f;
+        for (int i = 0; i < capacity; i++)
         {
-            cell.StopHintAnimation();
+            GameObject view = GameObject.Instantiate(prefab, new Vector3(startX + i, yPosition, 0f), Quaternion.identity, root);
+            view.name = string.Format("BottomCell_{0}", i);
+            Cell cell = view.GetComponent<Cell>();
+            cell.Setup(i, -1);
+            m_cells.Add(cell);
         }
-
-        m_potentialMatch.Clear();
+    }
+    public void Add(Item item, float duration, Action onComplete)
+    {
+        m_items.Add(item);
+        Cell destination = m_cells[m_items.Count - 1];
+        destination.Assign(item);
+        item.SetSortingLayerHigher();
+        item.View.DOKill();
+        item.View.DOMove(destination.transform.position, duration)
+            .SetEase(Ease.OutQuad)
+            .OnComplete(() =>
+            {
+                item.SetSortingLayerLower();
+                if (onComplete != null) onComplete();
+            });
+    }
+    public List<Item> FindMatch()
+    {
+        foreach (Item item in m_items)
+        {
+            List<Item> sameItems = m_items.Where(other => item.IsSameType(other)).ToList();
+            if (sameItems.Count == MatchSize) return sameItems;
+        }
+        return new List<Item>();
+    }
+    public void ClearMatch(List<Item> match)
+    {
+        foreach (Item item in match)
+        {
+            if (item.Cell != null) item.Cell.Free();
+            m_items.Remove(item);
+            item.ExplodeView();
+        }
+    }
+    public void Compact(float duration)
+    {
+        foreach (Cell cell in m_cells) cell.Free();
+        for (int i = 0; i < m_items.Count; i++)
+        {
+            Item item = m_items[i];
+            Cell destination = m_cells[i];
+            destination.Assign(item);
+            item.View.DOKill();
+            item.View.DOMove(destination.transform.position, duration).SetEase(Ease.OutQuad);
+        }
+    }
+    public void Clear()
+    {
+        foreach (Cell cell in m_cells)
+        {
+            if (cell == null) continue;
+            cell.Clear();
+            GameObject.Destroy(cell.gameObject);
+        }
+        m_items.Clear();
+        m_cells.Clear();
     }
 }
