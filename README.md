@@ -3,7 +3,7 @@
 ## Board Layout Inspector Tool
 
 - Board layouts are now stored in a separate BoardLayoutSO asset.
-- DefaultBoardLayout.asset contains the current 4 x 6, two-layer, 39-item level and is assigned in gamesettings.asset.
+- DefaultBoardLayout.asset contains the current 4 x 6, four-layer, 48-item level and is assigned in gamesettings.asset.
 - Each placement exposes Item Type, Layer, and Grid Position in the Inspector.
 - Grid positions snap to 0.5 units. Position (0, 0) is the bottom-left board cell.
 - The Inspector includes a board preview, list reordering, Snap All, Generate From Game Settings, and Assign To Game Settings actions.
@@ -19,7 +19,7 @@
 - ItemBackgroundScale and ItemBackgroundOpacity in Game Settings control the tile background thickness and visibility; the default scale is 1.08.
 - Same-layer items use a one-cell footprint; positions less than one unit apart on both axes are treated as overlapping and rejected.
 - Assign and asset saving are blocked while the layout has validation errors.
-- Every Type total across the full board must be divisible by three; per-layer Type counts remain divisible by three for the current Autoplay strategy.
+- Every Type total across the full board must be divisible by three. Individual layers do not need divisible-by-three Type counts.
 - A valid saved layout must contain all seven fish Types; with divisible-by-three counts this means at least three items of every Type.
 - Full-layout generation cycles Type groups across layers so all seven Types are included whenever the board has at least 21 playable items.
 - Board-to-tray movement uses a DOTween DOMove plus punch-scale animation on the complete tile root.
@@ -27,7 +27,7 @@
 - Game Settings exposes ItemMoveDuration, ItemMoveEase, ItemMovePunchScale, ItemMovePunchVibrato, ItemMovePunchElasticity, ItemClearDuration, and ItemClearEase.
 - The default board-to-tray movement uses 0.45 seconds with OutBounce for a clearer downward landing.
 - Every Game Settings field now includes an Inspector hover tooltip describing its runtime effect and recommended intent.
-- Validation reports duplicate positions, negative layers, off-grid positions, and layer/type counts that are not divisible by three.
+- Validation reports duplicate positions, negative layers, off-grid positions, and global Type totals that are not divisible by three.
 - Runtime blocking is calculated from the authored positions: an overlapping item on any higher layer blocks the lower item.
 - If Game Settings has no valid BoardLayoutSO assigned, the previous generated-board implementation remains available as a fallback.
 
@@ -35,15 +35,15 @@ Tài liệu này ghi lại các phần gameplay đã được thay đổi và nh
 
 ## Cập nhật triển khai mới nhất
 
-- Board hiện hỗ trợ nhiều layer lệch nhau nửa ô; mặc định là 2 layer.
+- Board hiện hỗ trợ nhiều layer lệch nhau nửa ô; layout mặc định hiện có 4 layer.
 - Mỗi item layer trên che tối đa 4 item layer dưới và item bị che không thể được chọn.
 - Item bị che được làm tối; trạng thái được cập nhật ngay khi blocker phía trên rời board.
 - Input, `AUTOPLAY` và `AUTO LOSE` đều chỉ được phép chọn item đang mở khóa.
-- Với board `4 × 6` và 2 layer, layer dưới có 24 item, layer trên có 15 item, tổng cộng 39 item.
+- Với board `4 × 6` hiện tại: Layer 0 có 24 item, Layer 1 có 15 item, Layer 2 có 8 item, Layer 3 có 1 item, tổng cộng 48 item.
 - Các button Home đã chuyển hoàn toàn sang GameObject thật trong scene; code không còn clone hoặc đổi vị trí button lúc runtime.
 - Khay dưới đã được đổi từ 7 ô thành đúng 5 ô.
 - Home screen hiện có ba lựa chọn: `PLAY`, `AUTOPLAY` và `AUTO LOSE`.
-- `AUTOPLAY` luôn bắt đầu từ board mới và chọn liên tiếp từng nhóm 3 item cùng loại cho tới khi thắng.
+- `AUTOPLAY` luôn bắt đầu từ board mới và lập kế hoạch xuyên các layer, tuân thủ blocker cùng giới hạn 5 ô cho tới khi thắng.
 - `AUTO LOSE` luôn bắt đầu từ board mới và chọn 5 item theo giới hạn tối đa 2 item mỗi loại, tạo trạng thái như `2 + 2 + 1` để chắc chắn thua.
 - Mỗi thao tác tự động có khoảng chờ 0,5 giây và chỉ diễn ra sau khi animation của thao tác trước đã hoàn tất.
 - Input thủ công bị khóa trong khi một chế độ tự động đang chạy.

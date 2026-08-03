@@ -39,7 +39,6 @@ public class BoardLayoutSO : ScriptableObject
         }
 
         Dictionary<NormalItem.eNormalType, int> totalTypeCounts = new Dictionary<NormalItem.eNormalType, int>();
-        Dictionary<int, Dictionary<NormalItem.eNormalType, int>> typeCountsByLayer = new Dictionary<int, Dictionary<NormalItem.eNormalType, int>>();
         foreach (BoardItemPlacement item in m_items)
         {
             if (item == null)
@@ -58,15 +57,6 @@ public class BoardLayoutSO : ScriptableObject
             int count;
             totalTypeCounts.TryGetValue(item.ItemType, out count);
             totalTypeCounts[item.ItemType] = count + 1;
-
-            Dictionary<NormalItem.eNormalType, int> layerCounts;
-            if (typeCountsByLayer.TryGetValue(item.Layer, out layerCounts) == false)
-            {
-                layerCounts = new Dictionary<NormalItem.eNormalType, int>();
-                typeCountsByLayer[item.Layer] = layerCounts;
-            }
-            layerCounts.TryGetValue(item.ItemType, out count);
-            layerCounts[item.ItemType] = count + 1;
         }
 
         for (int firstIndex = 0; firstIndex < m_items.Count; firstIndex++)
@@ -103,16 +93,6 @@ public class BoardLayoutSO : ScriptableObject
             }
         }
 
-        foreach (KeyValuePair<int, Dictionary<NormalItem.eNormalType, int>> layerPair in typeCountsByLayer)
-        {
-            foreach (KeyValuePair<NormalItem.eNormalType, int> typePair in layerPair.Value)
-            {
-                if (typePair.Value % 3 != 0)
-                {
-                    errors.Add(string.Format("Layer {0}, Type {1} has {2} items; Autoplay requires this count to be divisible by 3.", layerPair.Key, (int)typePair.Key + 1, typePair.Value));
-                }
-            }
-        }
         return errors;
     }
 

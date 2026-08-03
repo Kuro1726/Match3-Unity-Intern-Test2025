@@ -427,7 +427,7 @@ public class BoardLayoutSOEditor : Editor
         List<string> errors = BoardLayoutEditorValidation.GetErrors(layout);
         if (errors.Count == 0)
         {
-            EditorGUILayout.HelpBox("Valid layout: no overlaps, all items are inside the board, and every Type count is divisible by 3 globally and per layer.", MessageType.Info);
+            EditorGUILayout.HelpBox("Valid layout: no overlaps, all items are inside the board, and every Type count across the complete board is divisible by 3.", MessageType.Info);
             return;
         }
         foreach (string error in errors) EditorGUILayout.HelpBox(error, MessageType.Error);

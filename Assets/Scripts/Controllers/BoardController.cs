@@ -94,12 +94,15 @@ public class BoardController : MonoBehaviour
 
     private IEnumerator AutoWinCoroutine()
     {
-        int itemsLeftInGroup = 0;
-        int targetLayer = -1;
-        NormalItem.eNormalType targetType = default(NormalItem.eNormalType);
-        yield return new WaitForSeconds(AutoActionDelay);
+        List<Cell> plan;
+        if (m_board.TryBuildAutoWinPlan(m_bottomTray.Capacity, out plan) == false)
+        {
+            Debug.LogError("Autoplay could not find a winning sequence for this board layout.");
+            yield break;
+        }
 
-        while (m_gameOver == false && m_board.RemainingItemCount > 0)
+        yield return new WaitForSeconds(AutoActionDelay);
+        foreach (Cell targetCell in plan)
         {
             while (m_gameOver == false && (IsBusy || m_gameManager.State != GameManager.eStateGame.GAME_STARTED))
             {
@@ -107,16 +110,13 @@ public class BoardController : MonoBehaviour
             }
             if (m_gameOver) yield break;
 
-            if (itemsLeftInGroup == 0)
+            if (m_board.IsCellSelectable(targetCell) == false)
             {
-                if (m_board.TryFindSelectableTripleType(out targetType, out targetLayer) == false) yield break;
-                itemsLeftInGroup = RequiredMatchSize;
+                Debug.LogError("Autoplay plan became invalid before all items were cleared.");
+                yield break;
             }
 
-            Cell targetCell = m_board.FindCellOfType(targetType, targetLayer);
-            if (targetCell == null) yield break;
             TryMoveItemToTray(targetCell);
-            itemsLeftInGroup--;
             yield return new WaitForSeconds(AutoActionDelay);
         }
     }

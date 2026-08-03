@@ -25,6 +25,8 @@ public class Cell : MonoBehaviour
 
     private readonly List<Cell> m_blockers = new List<Cell>();
 
+    public IReadOnlyList<Cell> Blockers => m_blockers;
+
     public bool IsBlocked
     {
         get

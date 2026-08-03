@@ -217,68 +217,219 @@ public class Board
         return Contains(cell) && cell.IsEmpty == false && cell.IsBlocked == false;
     }
 
-    public bool TryFindSelectableTripleType(out NormalItem.eNormalType itemType, out int boardLayer)
+    public bool TryBuildAutoWinPlan(int trayCapacity, out List<Cell> plan)
     {
-        boardLayer = -1;
+        plan = new List<Cell>();
+        List<Cell> activeCells = new List<Cell>();
         foreach (Cell cell in m_cells)
         {
-            if (cell.IsEmpty == false && cell.BoardLayer > boardLayer)
+            if (cell != null && cell.IsEmpty == false) activeCells.Add(cell);
+        }
+
+        if (activeCells.Count == 0) return true;
+        if (activeCells.Count > 63 || trayCapacity < m_matchSize) return false;
+
+        Dictionary<Cell, int> cellIndices = new Dictionary<Cell, int>();
+        for (int index = 0; index < activeCells.Count; index++)
+        {
+            cellIndices[activeCells[index]] = index;
+        }
+
+        ulong[] blockerMasks = new ulong[activeCells.Count];
+        int[] itemTypes = new int[activeCells.Count];
+        for (int index = 0; index < activeCells.Count; index++)
+        {
+            Cell cell = activeCells[index];
+            NormalItem item = cell.Item as NormalItem;
+            if (item == null) return false;
+            itemTypes[index] = (int)item.ItemType;
+
+            foreach (Cell blocker in cell.Blockers)
             {
-                boardLayer = cell.BoardLayer;
+                int blockerIndex;
+                if (blocker != null && blocker.IsEmpty == false && cellIndices.TryGetValue(blocker, out blockerIndex))
+                {
+                    blockerMasks[index] |= 1UL << blockerIndex;
+                }
             }
         }
 
-        if (boardLayer < 0)
+        int typeCount = Enum.GetValues(typeof(NormalItem.eNormalType)).Length;
+        int[] trayTypeCounts = new int[typeCount];
+        List<int> path = new List<int>(activeCells.Count);
+        HashSet<AutoWinState> failedStates = new HashSet<AutoWinState>();
+        ulong remainingMask = (1UL << activeCells.Count) - 1UL;
+        if (FindAutoWinPath(remainingMask, 0, trayCapacity, activeCells, blockerMasks, itemTypes, trayTypeCounts, path, failedStates) == false)
         {
-            itemType = default(NormalItem.eNormalType);
             return false;
         }
 
-        Dictionary<NormalItem.eNormalType, int> counts = new Dictionary<NormalItem.eNormalType, int>();
-        foreach (Cell cell in m_cells)
+        foreach (int cellIndex in path) plan.Add(activeCells[cellIndex]);
+        return true;
+    }
+
+    private bool FindAutoWinPath(
+        ulong remainingMask,
+        int trayCount,
+        int trayCapacity,
+        List<Cell> activeCells,
+        ulong[] blockerMasks,
+        int[] itemTypes,
+        int[] trayTypeCounts,
+        List<int> path,
+        HashSet<AutoWinState> failedStates)
+    {
+        if (remainingMask == 0UL) return trayCount == 0;
+
+        AutoWinState state = new AutoWinState(remainingMask, EncodeTrayCounts(trayTypeCounts));
+        if (failedStates.Contains(state)) return false;
+
+        List<int> candidates = new List<int>();
+        for (int index = 0; index < activeCells.Count; index++)
         {
-            if (cell.BoardLayer != boardLayer || IsCellSelectable(cell) == false) continue;
-            NormalItem item = cell.Item as NormalItem;
-            if (item == null) continue;
-            int count;
-            counts.TryGetValue(item.ItemType, out count);
-            counts[item.ItemType] = count + 1;
-            if (count + 1 >= m_matchSize)
-            {
-                itemType = item.ItemType;
-                return true;
-            }
+            ulong cellBit = 1UL << index;
+            if ((remainingMask & cellBit) == 0UL) continue;
+            if ((remainingMask & blockerMasks[index]) != 0UL) continue;
+            candidates.Add(index);
         }
-        itemType = default(NormalItem.eNormalType);
+
+        candidates.Sort((left, right) =>
+        {
+            int leftType = itemTypes[left];
+            int rightType = itemTypes[right];
+            int trayPriority = trayTypeCounts[rightType].CompareTo(trayTypeCounts[leftType]);
+            if (trayPriority != 0) return trayPriority;
+            return activeCells[right].BoardLayer.CompareTo(activeCells[left].BoardLayer);
+        });
+
+        foreach (int cellIndex in candidates)
+        {
+            int itemType = itemTypes[cellIndex];
+            int previousTypeCount = trayTypeCounts[itemType];
+            int nextTrayCount = trayCount + 1;
+            trayTypeCounts[itemType] = previousTypeCount + 1;
+            if (trayTypeCounts[itemType] == m_matchSize)
+            {
+                trayTypeCounts[itemType] = 0;
+                nextTrayCount -= m_matchSize;
+            }
+
+            bool fillsTray = nextTrayCount >= trayCapacity;
+            if (fillsTray == false)
+            {
+                path.Add(cellIndex);
+                ulong nextRemainingMask = remainingMask & ~(1UL << cellIndex);
+                if (FindAutoWinPath(nextRemainingMask, nextTrayCount, trayCapacity, activeCells, blockerMasks, itemTypes, trayTypeCounts, path, failedStates))
+                {
+                    trayTypeCounts[itemType] = previousTypeCount;
+                    return true;
+                }
+                path.RemoveAt(path.Count - 1);
+            }
+            trayTypeCounts[itemType] = previousTypeCount;
+        }
+
+        failedStates.Add(state);
         return false;
     }
 
-    public Cell FindCellOfType(NormalItem.eNormalType itemType, int boardLayer)
+    private static int EncodeTrayCounts(int[] trayTypeCounts)
     {
-        foreach (Cell cell in m_cells)
+        int code = 0;
+        int multiplier = 1;
+        foreach (int count in trayTypeCounts)
         {
-            NormalItem item = cell.Item as NormalItem;
-            if (cell.BoardLayer == boardLayer && IsCellSelectable(cell) && item != null && item.ItemType == itemType) return cell;
+            code += count * multiplier;
+            multiplier *= 3;
         }
-        return null;
+        return code;
     }
+
     public List<Cell> BuildAutoLosePlan(int targetCount, int maxItemsPerType)
     {
-        List<Cell> result = new List<Cell>(targetCount);
-        Dictionary<NormalItem.eNormalType, int> counts = new Dictionary<NormalItem.eNormalType, int>();
+        List<Cell> activeCells = new List<Cell>();
         foreach (Cell cell in m_cells)
         {
-            if (result.Count >= targetCount) break;
-            if (IsCellSelectable(cell) == false) continue;
-            NormalItem item = cell.Item as NormalItem;
-            if (item == null) continue;
-            int count;
-            counts.TryGetValue(item.ItemType, out count);
-            if (count >= maxItemsPerType) continue;
-            counts[item.ItemType] = count + 1;
-            result.Add(cell);
+            if (cell != null && cell.IsEmpty == false) activeCells.Add(cell);
         }
+        if (activeCells.Count > 63) return new List<Cell>();
+
+        Dictionary<Cell, int> cellIndices = new Dictionary<Cell, int>();
+        for (int index = 0; index < activeCells.Count; index++) cellIndices[activeCells[index]] = index;
+
+        ulong[] blockerMasks = new ulong[activeCells.Count];
+        int[] itemTypes = new int[activeCells.Count];
+        for (int index = 0; index < activeCells.Count; index++)
+        {
+            Cell cell = activeCells[index];
+            NormalItem item = cell.Item as NormalItem;
+            if (item == null) return new List<Cell>();
+            itemTypes[index] = (int)item.ItemType;
+            foreach (Cell blocker in cell.Blockers)
+            {
+                int blockerIndex;
+                if (blocker != null && blocker.IsEmpty == false && cellIndices.TryGetValue(blocker, out blockerIndex))
+                {
+                    blockerMasks[index] |= 1UL << blockerIndex;
+                }
+            }
+        }
+
+        int typeCount = Enum.GetValues(typeof(NormalItem.eNormalType)).Length;
+        int[] selectedTypeCounts = new int[typeCount];
+        List<int> path = new List<int>(targetCount);
+        ulong remainingMask = activeCells.Count == 0 ? 0UL : (1UL << activeCells.Count) - 1UL;
+        if (FindAutoLosePath(remainingMask, targetCount, maxItemsPerType, activeCells, blockerMasks, itemTypes, selectedTypeCounts, path) == false)
+        {
+            return new List<Cell>();
+        }
+
+        List<Cell> result = new List<Cell>(path.Count);
+        foreach (int cellIndex in path) result.Add(activeCells[cellIndex]);
         return result;
+    }
+
+    private bool FindAutoLosePath(
+        ulong remainingMask,
+        int targetCount,
+        int maxItemsPerType,
+        List<Cell> activeCells,
+        ulong[] blockerMasks,
+        int[] itemTypes,
+        int[] selectedTypeCounts,
+        List<int> path)
+    {
+        if (path.Count >= targetCount) return true;
+
+        List<int> candidates = new List<int>();
+        for (int index = 0; index < activeCells.Count; index++)
+        {
+            ulong cellBit = 1UL << index;
+            if ((remainingMask & cellBit) == 0UL || (remainingMask & blockerMasks[index]) != 0UL) continue;
+            if (selectedTypeCounts[itemTypes[index]] >= maxItemsPerType) continue;
+            candidates.Add(index);
+        }
+        candidates.Sort((left, right) =>
+        {
+            int typePriority = selectedTypeCounts[itemTypes[left]].CompareTo(selectedTypeCounts[itemTypes[right]]);
+            if (typePriority != 0) return typePriority;
+            return activeCells[right].BoardLayer.CompareTo(activeCells[left].BoardLayer);
+        });
+
+        foreach (int cellIndex in candidates)
+        {
+            int itemType = itemTypes[cellIndex];
+            selectedTypeCounts[itemType]++;
+            path.Add(cellIndex);
+            if (FindAutoLosePath(remainingMask & ~(1UL << cellIndex), targetCount, maxItemsPerType, activeCells, blockerMasks, itemTypes, selectedTypeCounts, path))
+            {
+                selectedTypeCounts[itemType]--;
+                return true;
+            }
+            path.RemoveAt(path.Count - 1);
+            selectedTypeCounts[itemType]--;
+        }
+        return false;
     }
 
     private void RefreshBlockedVisuals()
@@ -292,6 +443,36 @@ public class Board
     private bool Contains(Cell target)
     {
         return target != null && m_cells.Contains(target);
+    }
+
+    private struct AutoWinState : IEquatable<AutoWinState>
+    {
+        private readonly ulong m_remainingMask;
+        private readonly int m_trayCode;
+
+        public AutoWinState(ulong remainingMask, int trayCode)
+        {
+            m_remainingMask = remainingMask;
+            m_trayCode = trayCode;
+        }
+
+        public bool Equals(AutoWinState other)
+        {
+            return m_remainingMask == other.m_remainingMask && m_trayCode == other.m_trayCode;
+        }
+
+        public override bool Equals(object other)
+        {
+            return other is AutoWinState && Equals((AutoWinState)other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                return (m_remainingMask.GetHashCode() * 397) ^ m_trayCode;
+            }
+        }
     }
 
     public void Clear()
