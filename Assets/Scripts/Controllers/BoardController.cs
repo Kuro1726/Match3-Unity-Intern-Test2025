@@ -9,6 +9,7 @@ public class BoardController : MonoBehaviour
 {
     public event Action OnMoveEvent = delegate { };
     public event Action<int, int, int> OnProgressChanged = delegate { };
+    public event Action<float> OnTimeChanged = delegate { };
     public bool IsBusy { get; private set; }
 
     private const int RequiredMatchSize = 3;
@@ -20,13 +21,19 @@ public class BoardController : MonoBehaviour
     private bool m_gameOver;
     private bool m_operationInProgress;
     private bool m_autoPlaying;
+    private bool m_isTimeAttack;
     private float m_moveDuration;
     private float m_clearDuration;
+    private float m_timeRemaining;
+    private int m_lastReportedSecond = -1;
+    private readonly Dictionary<Item, Cell> m_itemOrigins = new Dictionary<Item, Cell>();
 
     public void StartGame(GameManager gameManager, GameSettings gameSettings)
     {
         m_gameManager = gameManager;
         m_gameManager.StateChangedAction += OnGameStateChange;
+        m_isTimeAttack = m_gameManager.CurrentPlayMode == GameManager.ePlayMode.TIME_ATTACK;
+        m_timeRemaining = Mathf.Max(1f, gameSettings.TimeAttackDuration);
         m_camera = Camera.main;
         m_board = new Board(transform, gameSettings);
         m_board.Fill();
@@ -38,6 +45,7 @@ public class BoardController : MonoBehaviour
         m_bottomTray = new BottomTray(transform, trayCapacity, RequiredMatchSize, trayY, gameSettings);
         IsBusy = false;
         NotifyProgressChanged();
+        if (m_isTimeAttack) NotifyTimeChanged(true);
     }
     private void OnGameStateChange(GameManager.eStateGame state)
     {
@@ -51,12 +59,25 @@ public class BoardController : MonoBehaviour
     }
     public void Update()
     {
+        UpdateTimeAttackTimer();
         if (m_autoPlaying) return;
         if (m_gameOver || IsBusy || m_camera == null) return;
         if (Input.GetMouseButtonDown(0) == false) return;
 
         Vector2 worldPosition = m_camera.ScreenToWorldPoint(Input.mousePosition);
         RaycastHit2D[] hits = Physics2D.RaycastAll(worldPosition, Vector2.zero);
+        if (m_isTimeAttack)
+        {
+            Cell selectedTrayCell = hits
+                .Select(hit => hit.collider.GetComponent<Cell>())
+                .FirstOrDefault(cell => m_bottomTray.Contains(cell) && cell.IsEmpty == false);
+            if (selectedTrayCell != null)
+            {
+                TryReturnItemToBoard(selectedTrayCell);
+                return;
+            }
+        }
+
         Cell selectedCell = hits
             .Select(hit => hit.collider.GetComponent<Cell>())
             .Where(cell => m_board.IsCellSelectable(cell))
@@ -67,7 +88,7 @@ public class BoardController : MonoBehaviour
 
     public void StartAutoPlay(GameManager.ePlayMode mode)
     {
-        if (mode == GameManager.ePlayMode.MANUAL) return;
+        if (mode != GameManager.ePlayMode.AUTO_WIN && mode != GameManager.ePlayMode.AUTO_LOSE) return;
         m_autoPlaying = true;
         if (mode == GameManager.ePlayMode.AUTO_WIN)
         {
@@ -84,12 +105,57 @@ public class BoardController : MonoBehaviour
 
         Item item;
         if (m_board.TryTakeItem(selectedCell, out item) == false) return;
+        if (m_itemOrigins.ContainsKey(item) == false) m_itemOrigins[item] = selectedCell;
 
         m_operationInProgress = true;
         IsBusy = true;
         OnMoveEvent();
         m_bottomTray.Add(item, m_moveDuration, () => StartCoroutine(ResolveMoveCoroutine()));
         NotifyProgressChanged();
+    }
+
+    private void TryReturnItemToBoard(Cell trayCell)
+    {
+        Item item;
+        if (m_bottomTray.TryGetItem(trayCell, out item) == false) return;
+
+        Cell originCell;
+        if (m_itemOrigins.TryGetValue(item, out originCell) == false || originCell == null || originCell.IsEmpty == false) return;
+
+        m_operationInProgress = true;
+        IsBusy = true;
+        if (m_bottomTray.Remove(item, m_moveDuration) == false || m_board.TryReturnItem(originCell, item) == false)
+        {
+            m_operationInProgress = false;
+            IsBusy = false;
+            return;
+        }
+
+        NotifyProgressChanged();
+        item.SetSortingLayerHigher();
+        item.View.DOKill();
+        item.View.DOMove(originCell.transform.position, m_moveDuration)
+            .SetEase(Ease.OutQuad)
+            .OnComplete(() =>
+            {
+                item.SetSortingOrder(originCell.BoardLayer * 10);
+                m_operationInProgress = false;
+                IsBusy = false;
+                NotifyProgressChanged();
+            });
+    }
+
+    private void UpdateTimeAttackTimer()
+    {
+        if (m_isTimeAttack == false || m_gameOver || m_gameManager == null) return;
+        if (m_gameManager.State != GameManager.eStateGame.GAME_STARTED) return;
+
+        m_timeRemaining = Mathf.Max(0f, m_timeRemaining - Time.deltaTime);
+        NotifyTimeChanged(false);
+        if (m_timeRemaining <= 0f && m_board != null && m_board.RemainingItemCount > 0)
+        {
+            FinishGame(GameManager.eGameResult.LOSE);
+        }
     }
 
     private IEnumerator AutoWinCoroutine()
@@ -145,9 +211,11 @@ public class BoardController : MonoBehaviour
     }
     private IEnumerator ResolveMoveCoroutine()
     {
+        if (m_gameOver) yield break;
         List<Item> match = m_bottomTray.FindMatch();
         if (match.Count == m_bottomTray.MatchSize)
         {
+            foreach (Item matchedItem in match) m_itemOrigins.Remove(matchedItem);
             m_bottomTray.ClearMatch(match);
             NotifyProgressChanged();
             yield return new WaitForSeconds(m_clearDuration);
@@ -156,12 +224,12 @@ public class BoardController : MonoBehaviour
             NotifyProgressChanged();
         }
 
-        if (m_board.RemainingItemCount == 0 && m_bottomTray.Count == 0)
+        if (m_board.RemainingItemCount == 0 && (m_isTimeAttack || m_bottomTray.Count == 0))
         {
             FinishGame(GameManager.eGameResult.WIN);
             yield break;
         }
-        if (m_bottomTray.IsFull)
+        if (m_isTimeAttack == false && m_bottomTray.IsFull)
         {
             FinishGame(GameManager.eGameResult.LOSE);
             yield break;
@@ -182,6 +250,14 @@ public class BoardController : MonoBehaviour
         OnProgressChanged(m_bottomTray.Count, m_bottomTray.Capacity, m_board.RemainingItemCount);
     }
 
+    private void NotifyTimeChanged(bool force)
+    {
+        int displayedSecond = Mathf.CeilToInt(m_timeRemaining);
+        if (force == false && displayedSecond == m_lastReportedSecond) return;
+        m_lastReportedSecond = displayedSecond;
+        OnTimeChanged(m_timeRemaining);
+    }
+
     internal void Clear()
     {
         StopAllCoroutines();
@@ -196,6 +272,7 @@ public class BoardController : MonoBehaviour
             m_board.Clear();
             m_board = null;
         }
+        m_itemOrigins.Clear();
     }
 }
 
@@ -253,6 +330,28 @@ internal class BottomTray
                 if (onComplete != null) onComplete();
             });
     }
+
+    public bool Contains(Cell cell)
+    {
+        return cell != null && m_cells.Contains(cell);
+    }
+
+    public bool TryGetItem(Cell cell, out Item item)
+    {
+        item = null;
+        if (Contains(cell) == false || cell.IsEmpty) return false;
+        item = cell.Item;
+        return item != null && m_items.Contains(item);
+    }
+
+    public bool Remove(Item item, float compactDuration)
+    {
+        if (item == null || m_items.Remove(item) == false) return false;
+        if (item.Cell != null) item.Cell.Free();
+        Compact(compactDuration);
+        return true;
+    }
+
     public List<Item> FindMatch()
     {
         foreach (Item item in m_items)

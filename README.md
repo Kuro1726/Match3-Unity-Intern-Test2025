@@ -31,6 +31,15 @@
 - Runtime blocking is calculated from the authored positions: an overlapping item on any higher layer blocks the lower item.
 - If Game Settings has no valid BoardLayoutSO assigned, the previous generated-board implementation remains available as a fallback.
 
+## Time Attack Mode
+
+- The Home screen contains a real, editable `btnTimeAttack` GameObject under `ButtonsContainer`.
+- Time Attack starts a separate 60-second game mode. `TimeAttackDuration` in Game Settings controls this limit.
+- Filling all five tray cells does not cause a loss in this mode.
+- Tapping a tray item returns it to its original board Cell, restores its blocker relationships, and compacts the remaining tray items.
+- The timer pauses with the game. Clearing the board wins; reaching zero while board items remain loses.
+- The existing Play, Autoplay, and Auto Lose rules remain unchanged.
+
 Tài liệu này ghi lại các phần gameplay đã được thay đổi và những hạng mục sẽ triển khai tiếp theo.
 
 ## Cập nhật triển khai mới nhất
@@ -42,12 +51,14 @@ Tài liệu này ghi lại các phần gameplay đã được thay đổi và nh
 - Với board `4 × 6` hiện tại: Layer 0 có 24 item, Layer 1 có 15 item, Layer 2 có 8 item, Layer 3 có 1 item, tổng cộng 48 item.
 - Các button Home đã chuyển hoàn toàn sang GameObject thật trong scene; code không còn clone hoặc đổi vị trí button lúc runtime.
 - Khay dưới đã được đổi từ 7 ô thành đúng 5 ô.
-- Home screen hiện có ba lựa chọn: `PLAY`, `AUTOPLAY` và `AUTO LOSE`.
+- Home screen hiện có bốn lựa chọn: `PLAY`, `AUTOPLAY`, `AUTO LOSE` và `TIME ATTACK`.
 - `AUTOPLAY` luôn bắt đầu từ board mới và lập kế hoạch xuyên các layer, tuân thủ blocker cùng giới hạn 5 ô cho tới khi thắng.
 - `AUTO LOSE` luôn bắt đầu từ board mới và chọn 5 item theo giới hạn tối đa 2 item mỗi loại, tạo trạng thái như `2 + 2 + 1` để chắc chắn thua.
 - Mỗi thao tác tự động có khoảng chờ 0,5 giây và chỉ diễn ra sau khi animation của thao tác trước đã hoàn tất.
 - Input thủ công bị khóa trong khi một chế độ tự động đang chạy.
 - Pause/resume giữ nguyên kế hoạch tự động và không tạo thêm thao tác chồng lặp.
+- `TIME ATTACK` có giới hạn 60 giây; đầy khay không làm thua và người chơi có thể chạm item trong khay để trả nó về Cell xuất phát.
+- Trong Time Attack, dọn hết item trên board sẽ thắng; hết giờ khi board vẫn còn item sẽ thua.
 
 ## Gameplay hiện tại
 

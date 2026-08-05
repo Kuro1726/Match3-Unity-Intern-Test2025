@@ -60,6 +60,11 @@ public class GameSettings : ScriptableObject
     [Tooltip("DOTween ease used by the scale-to-zero clear animation.")]
     public Ease ItemClearEase = Ease.InBack;
 
+    [Header("Time Attack")]
+    [Tooltip("Seconds available to clear the board in Time Attack mode. The timer pauses while the game is paused.")]
+    [Min(1f)]
+    public float TimeAttackDuration = 60f;
+
     [Header("Legacy Level Conditions")]
     [Tooltip("Move limit used by the legacy move-based level mode.")]
     public int LevelMoves = 16;

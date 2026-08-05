@@ -212,6 +212,15 @@ public class Board
         return true;
     }
 
+    public bool TryReturnItem(Cell cell, Item item)
+    {
+        if (Contains(cell) == false || cell.IsEmpty == false || item == null) return false;
+        cell.Assign(item);
+        m_remainingItemCount++;
+        RefreshBlockedVisuals();
+        return true;
+    }
+
     public bool IsCellSelectable(Cell cell)
     {
         return Contains(cell) && cell.IsEmpty == false && cell.IsBlocked == false;

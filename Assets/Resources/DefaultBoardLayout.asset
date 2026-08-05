@@ -23,16 +23,16 @@ MonoBehaviour:
   - ItemType: 4
     Layer: 0
     GridPosition: {x: 2, y: 0}
-  - ItemType: 2
+  - ItemType: 1
     Layer: 0
     GridPosition: {x: 3, y: 0}
   - ItemType: 0
     Layer: 0
     GridPosition: {x: 0, y: 1}
-  - ItemType: 2
+  - ItemType: 1
     Layer: 0
     GridPosition: {x: 1, y: 1}
-  - ItemType: 3
+  - ItemType: 1
     Layer: 0
     GridPosition: {x: 2, y: 1}
   - ItemType: 3
@@ -50,7 +50,7 @@ MonoBehaviour:
   - ItemType: 1
     Layer: 0
     GridPosition: {x: 3, y: 2}
-  - ItemType: 6
+  - ItemType: 0
     Layer: 0
     GridPosition: {x: 0, y: 3}
   - ItemType: 1
@@ -95,7 +95,7 @@ MonoBehaviour:
   - ItemType: 4
     Layer: 1
     GridPosition: {x: 2.5, y: 0.5}
-  - ItemType: 1
+  - ItemType: 2
     Layer: 1
     GridPosition: {x: 0.5, y: 1.5}
   - ItemType: 5
@@ -125,13 +125,13 @@ MonoBehaviour:
   - ItemType: 4
     Layer: 1
     GridPosition: {x: 0.5, y: 4.5}
-  - ItemType: 1
+  - ItemType: 3
     Layer: 1
     GridPosition: {x: 1.5, y: 4.5}
   - ItemType: 5
     Layer: 1
     GridPosition: {x: 2.5, y: 4.5}
-  - ItemType: 1
+  - ItemType: 2
     Layer: 2
     GridPosition: {x: 1, y: 1}
   - ItemType: 3
@@ -140,7 +140,7 @@ MonoBehaviour:
   - ItemType: 5
     Layer: 2
     GridPosition: {x: 1, y: 2}
-  - ItemType: 0
+  - ItemType: 6
     Layer: 2
     GridPosition: {x: 2, y: 2}
   - ItemType: 0

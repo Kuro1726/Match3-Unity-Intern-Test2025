@@ -27,6 +27,7 @@ MonoBehaviour:
   ItemMovePunchElasticity: 0.55
   ItemClearDuration: 0.18
   ItemClearEase: 26
+  TimeAttackDuration: 60
   LevelMoves: 16
   LevelTime: 30
   TimeForHint: 5

@@ -34,7 +34,8 @@ public class GameManager : MonoBehaviour
     {
         MANUAL,
         AUTO_WIN,
-        AUTO_LOSE
+        AUTO_LOSE,
+        TIME_ATTACK
     }
 
     private eStateGame m_state;
@@ -75,13 +76,6 @@ public class GameManager : MonoBehaviour
         State = eStateGame.MAIN_MENU;
     }
 
-    // Update is called once per frame
-    void Update()
-    {
-        if (m_boardController != null) m_boardController.Update();
-    }
-
-
     internal void SetState(eStateGame state)
     {
         State = state;
@@ -106,8 +100,10 @@ public class GameManager : MonoBehaviour
         ClearLevel();
         LastResult = eGameResult.NONE;
         CurrentPlayMode = mode;
+        m_uiMenu.ConfigureGameplayMode(mode == ePlayMode.TIME_ATTACK);
         m_boardController = new GameObject("BoardController").AddComponent<BoardController>();
         m_boardController.OnProgressChanged += OnProgressChanged;
+        m_boardController.OnTimeChanged += OnTimeChanged;
         m_boardController.StartGame(this, m_gameSettings);
 
         State = eStateGame.GAME_STARTED;
@@ -132,11 +128,17 @@ public class GameManager : MonoBehaviour
         m_uiMenu.UpdateGameProgress(trayCount, trayCapacity, remainingItems);
     }
 
+    private void OnTimeChanged(float remainingSeconds)
+    {
+        m_uiMenu.UpdateGameTime(remainingSeconds);
+    }
+
     internal void ClearLevel()
     {
         if (m_boardController)
         {
             m_boardController.OnProgressChanged -= OnProgressChanged;
+            m_boardController.OnTimeChanged -= OnTimeChanged;
             m_boardController.Clear();
             Destroy(m_boardController.gameObject);
             m_boardController = null;

@@ -124,6 +124,18 @@ public class UIMainManager : MonoBehaviour
         }
     }
 
+    internal void ConfigureGameplayMode(bool showTimeAttackTimer)
+    {
+        UIPanelGame game = m_menuList.Where(x => x is UIPanelGame).Cast<UIPanelGame>().FirstOrDefault();
+        if (game) game.ConfigureMode(showTimeAttackTimer);
+    }
+
+    internal void UpdateGameTime(float remainingSeconds)
+    {
+        UIPanelGame game = m_menuList.Where(x => x is UIPanelGame).Cast<UIPanelGame>().FirstOrDefault();
+        if (game) game.UpdateTime(remainingSeconds);
+    }
+
     internal void ShowPauseMenu()
     {
         m_gameManager.SetState(GameManager.eStateGame.PAUSE);
@@ -152,6 +164,11 @@ public class UIMainManager : MonoBehaviour
     internal void LoadAutoLoseGame()
     {
         m_gameManager.LoadLevel(GameManager.ePlayMode.AUTO_LOSE);
+    }
+
+    internal void LoadTimeAttackGame()
+    {
+        m_gameManager.LoadLevel(GameManager.ePlayMode.TIME_ATTACK);
     }
 
     internal void ShowGameMenu()
