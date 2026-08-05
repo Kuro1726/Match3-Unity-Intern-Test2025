@@ -40,13 +40,6 @@ A valid layout must:
 - Contain all seven fish types.
 - Have a total count divisible by three for every type across the complete board. Individual layers do not need divisible-by-three counts.
 
-The current default board is 4 x 6 with 48 items:
-
-- Layer 0: 24
-- Layer 1: 15
-- Layer 2: 8
-- Layer 3: 1
-
 ## Configuration and Animation
 
 `GameSettings` exposes the tray size, Time Attack duration, item background appearance, movement timing/easing, punch effect, and clear animation settings. Inspector tooltips describe each field.
