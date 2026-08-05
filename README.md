@@ -1,166 +1,73 @@
-# Match3 Unity – Gameplay Rewrite Notes
+# Match3 Unity - Gameplay Rewrite
 
-## Board Layout Inspector Tool
+This project replaces the original swap-based match-3 gameplay with a layered tile-and-tray game.
 
-- Board layouts are now stored in a separate BoardLayoutSO asset.
-- DefaultBoardLayout.asset contains the current 4 x 6, four-layer, 48-item level and is assigned in gamesettings.asset.
-- Each placement exposes Item Type, Layer, and Grid Position in the Inspector.
-- Grid positions snap to 0.5 units. Position (0, 0) is the bottom-left board cell.
-- The Inspector includes a board preview, list reordering, Snap All, Generate From Game Settings, and Assign To Game Settings actions.
-- The Inspector color legend now matches gameplay: Type 1 brown, Type 2 red, Type 3 yellow, Type 4 blue, Type 5 green, Type 6 purple, and Type 7 pink.
-- Layer tabs filter both the preview and item list so dense layouts remain readable.
-- Add New Layer creates the next half-cell-offset layer, fills it with valid groups of three, and updates BoardLayerCount in Game Settings.
-- Remove Layer deletes the selected layer (or the highest layer from All), shifts every higher layer down by one, reapplies the half-cell offset, and updates BoardLayerCount.
-- Item positions and layer indices are clamped to the valid board area when edited.
-- Adding an item to a full layer is rejected instead of placing it outside the board.
-- Existing out-of-bounds items are reported and can be removed with Remove Items Outside Board.
-- Each runtime item now owns a visual copy of cellBackground, so the item and background move, compact, and disappear as one tile.
-- Logical board cell renderers are hidden while their colliders remain available for input and blocking checks.
-- ItemBackgroundScale and ItemBackgroundOpacity in Game Settings control the tile background thickness and visibility; the default scale is 1.08.
-- Same-layer items use a one-cell footprint; positions less than one unit apart on both axes are treated as overlapping and rejected.
-- Assign and asset saving are blocked while the layout has validation errors.
-- Every Type total across the full board must be divisible by three. Individual layers do not need divisible-by-three Type counts.
-- A valid saved layout must contain all seven fish Types; with divisible-by-three counts this means at least three items of every Type.
-- Full-layout generation cycles Type groups across layers so all seven Types are included whenever the board has at least 21 playable items.
-- Board-to-tray movement uses a DOTween DOMove plus punch-scale animation on the complete tile root.
-- Matching tiles clear with DOTween by scaling the item and its background fully to zero before destruction.
-- Game Settings exposes ItemMoveDuration, ItemMoveEase, ItemMovePunchScale, ItemMovePunchVibrato, ItemMovePunchElasticity, ItemClearDuration, and ItemClearEase.
-- The default board-to-tray movement uses 0.45 seconds with OutBounce for a clearer downward landing.
-- Every Game Settings field now includes an Inspector hover tooltip describing its runtime effect and recommended intent.
-- Validation reports duplicate positions, negative layers, off-grid positions, and global Type totals that are not divisible by three.
-- Runtime blocking is calculated from the authored positions: an overlapping item on any higher layer blocks the lower item.
-- If Game Settings has no valid BoardLayoutSO assigned, the previous generated-board implementation remains available as a fallback.
+## Core Gameplay
 
-## Time Attack Mode
+1. Tap an unblocked item on the board to move it into the five-cell tray.
+2. Items cannot return to the board in standard Play mode.
+3. Exactly three identical items are cleared automatically.
+4. Clear every item to win.
+5. Filling all five tray cells without a match causes a loss.
 
-- The Home screen contains a real, editable `btnTimeAttack` GameObject under `ButtonsContainer`.
-- Time Attack starts a separate 60-second game mode. `TimeAttackDuration` in Game Settings controls this limit.
-- Filling all five tray cells does not cause a loss in this mode.
-- Tapping a tray item returns it to its original board Cell, restores its blocker relationships, and compacts the remaining tray items.
-- The timer pauses with the game. Clearing the board wins; reaching zero while board items remain loses.
-- The existing Play, Autoplay, and Auto Lose rules remain unchanged.
+Items on higher layers block overlapping items below them. Blocked items are darkened and become selectable as soon as their blockers leave the board.
 
-Tài liệu này ghi lại các phần gameplay đã được thay đổi và những hạng mục sẽ triển khai tiếp theo.
+## Game Modes
 
-## Cập nhật triển khai mới nhất
+- **Play:** Standard manual gameplay.
+- **Autoplay:** Searches for a complete winning sequence, then performs each move with a 0.5-second delay. The search respects blockers, matches, and tray capacity.
+- **Auto Lose:** Finds five selectable items without creating a triple, then plays that losing sequence with a 0.5-second delay.
+- **Time Attack:** Gives the player 60 seconds to clear the board. A full tray does not cause a loss; tapping a tray item returns it to its original board cell. The timer pauses with the game.
 
-- Board hiện hỗ trợ nhiều layer lệch nhau nửa ô; layout mặc định hiện có 4 layer.
-- Mỗi item layer trên che tối đa 4 item layer dưới và item bị che không thể được chọn.
-- Item bị che được làm tối; trạng thái được cập nhật ngay khi blocker phía trên rời board.
-- Input, `AUTOPLAY` và `AUTO LOSE` đều chỉ được phép chọn item đang mở khóa.
-- Với board `4 × 6` hiện tại: Layer 0 có 24 item, Layer 1 có 15 item, Layer 2 có 8 item, Layer 3 có 1 item, tổng cộng 48 item.
-- Các button Home đã chuyển hoàn toàn sang GameObject thật trong scene; code không còn clone hoặc đổi vị trí button lúc runtime.
-- Khay dưới đã được đổi từ 7 ô thành đúng 5 ô.
-- Home screen hiện có bốn lựa chọn: `PLAY`, `AUTOPLAY`, `AUTO LOSE` và `TIME ATTACK`.
-- `AUTOPLAY` luôn bắt đầu từ board mới và lập kế hoạch xuyên các layer, tuân thủ blocker cùng giới hạn 5 ô cho tới khi thắng.
-- `AUTO LOSE` luôn bắt đầu từ board mới và chọn 5 item theo giới hạn tối đa 2 item mỗi loại, tạo trạng thái như `2 + 2 + 1` để chắc chắn thua.
-- Mỗi thao tác tự động có khoảng chờ 0,5 giây và chỉ diễn ra sau khi animation của thao tác trước đã hoàn tất.
-- Input thủ công bị khóa trong khi một chế độ tự động đang chạy.
-- Pause/resume giữ nguyên kế hoạch tự động và không tạo thêm thao tác chồng lặp.
-- `TIME ATTACK` có giới hạn 60 giây; đầy khay không làm thua và người chơi có thể chạm item trong khay để trả nó về Cell xuất phát.
-- Trong Time Attack, dọn hết item trên board sẽ thắng; hết giờ khi board vẫn còn item sẽ thua.
+Time Attack wins when no board items remain and loses when the timer reaches zero while items remain.
 
-## Gameplay hiện tại
+## Board Layout Tool
 
-Project đã được chuyển từ cơ chế match-3 kéo đổi vị trí sang cơ chế chọn item và ghép ba trong khay:
+Board layouts are stored in `BoardLayoutSO` assets and edited through the custom Inspector.
 
-1. Người chơi chạm vào một item trên board để chuyển item đó xuống khay phía dưới.
-2. Item đã xuống khay không thể quay lại board.
-3. Khi trong khay có đúng 3 item cùng loại, ba item đó được xóa và các item còn lại được dồn lại.
-4. Người chơi thắng khi toàn bộ item trên board và trong khay đã được xóa.
-5. Người chơi thua nếu toàn bộ ô trong khay bị lấp đầy mà không tạo được bộ ba.
+The tool provides:
 
-## Các phần đã thực hiện
+- A colored board preview and per-layer tabs.
+- Half-cell position snapping.
+- Item and layer creation/removal.
+- Automatic board-bound clamping.
+- Validation before Assign or asset saving.
 
-- Thay thao tác kéo đổi hai item bằng thao tác chạm để đưa một item xuống khay.
-- Tạo khay dưới bằng các cell sinh động lúc bắt đầu level.
-- Ngăn item trong khay được chọn để đưa trở lại board.
-- Kiểm tra và xóa đúng 3 item cùng loại ngay sau mỗi lượt chọn.
-- Dồn các item còn lại trong khay sau khi một bộ ba bị xóa.
-- Sinh board theo từng nhóm 3 item cùng loại và xáo trộn vị trí. Vì vậy số lượng của mỗi loại item được sử dụng luôn chia hết cho 3.
-- Thêm điều kiện thắng và thua độc lập với giới hạn lượt hoặc thời gian cũ.
-- Hiển thị đúng popup `LEVEL WIN` khi thắng và `GAME OVER` khi thua.
-- Cập nhật HUD để hiển thị số item trong khay và số item còn lại trên board.
-- Giữ trạng thái bận khi pause giữa một animation, tránh nhận nhiều thao tác chồng lên nhau.
-- Sửa lỗi nút Timer không được gán trong Home screen gây `NullReferenceException`.
-- Giữ nguyên các thay đổi có sẵn của project trong 7 prefab normal item.
+A valid layout must:
 
-### Các file chính đã thay đổi
+- Stay inside the configured board bounds.
+- Have no overlapping items on the same layer.
+- Contain all seven fish types.
+- Have a total count divisible by three for every type across the complete board. Individual layers do not need divisible-by-three counts.
+
+The current default board is 4 x 6 with 48 items:
+
+- Layer 0: 24
+- Layer 1: 15
+- Layer 2: 8
+- Layer 3: 1
+
+## Configuration and Animation
+
+`GameSettings` exposes the tray size, Time Attack duration, item background appearance, movement timing/easing, punch effect, and clear animation settings. Inspector tooltips describe each field.
+
+DOTween is used for:
+
+- Board-to-tray movement.
+- Tray-to-board return movement in Time Attack.
+- Tray compaction.
+- Scaling matched items to zero.
+
+## Main Files
 
 - `Assets/Scripts/Board/Board.cs`
+- `Assets/Scripts/Board/BoardLayoutSO.cs`
 - `Assets/Scripts/Board/Cell.cs`
 - `Assets/Scripts/Board/Item.cs`
 - `Assets/Scripts/Controllers/BoardController.cs`
 - `Assets/Scripts/Controllers/GameManager.cs`
 - `Assets/Scripts/GameSettings.cs`
-- `Assets/Resources/gamesettings.asset`
-- `Assets/Scripts/UI/UIMainManager.cs`
-- `Assets/Scripts/UI/UIPanelGame.cs`
-- `Assets/Scripts/UI/UIPanelGameOver.cs`
-- `Assets/Scripts/UI/UIPanelMain.cs`
+- `Assets/Scripts/Editor/BoardLayoutSOEditor.cs`
+- `Assets/Scenes/Game.unity`
 
-## Trạng thái kiểm tra
-
-- Mã runtime đã được biên dịch thành công bằng compiler và các assembly của Unity 2020.3.38f1.
-- Chưa thực hiện kiểm thử Play Mode tự động vì project đang mở trong Unity và Unity batch process riêng không có license hợp lệ.
-- Cần kiểm tra trực quan animation, kích thước khay và các popup trong Unity Play Mode.
-
-## Kế hoạch yêu cầu tiếp theo (đã triển khai)
-
-### 1. Khay 5 ô
-
-- Đổi số ô dưới khay từ 7 thành đúng 5.
-- Cập nhật HUD và bố cục để khay 5 ô nằm cân giữa màn hình.
-- Kiểm tra điều kiện thua sau khi xử lý match, để trường hợp item thứ năm tạo thành bộ ba không bị xử thua sai.
-
-### 2. Màn hình kết quả
-
-- Giữ hoặc đơn giản hóa màn hình thắng với nội dung rõ ràng.
-- Giữ hoặc đơn giản hóa màn hình thua với nội dung rõ ràng.
-- Đảm bảo mỗi kết quả chỉ hiển thị đúng một màn hình.
-
-### 3. Home screen
-
-Home screen sẽ có ba lựa chọn:
-
-- `Play`: chơi thủ công.
-- `Autoplay`: tự động chơi để thắng.
-- `Auto Lose`: tự động chơi để thua.
-
-### 4. Autoplay thắng
-
-- Khi nhấn `Autoplay`, game bắt đầu từ một board mới hợp lệ.
-- Hệ thống lập kế hoạch chọn trọn từng nhóm 3 item cùng loại.
-- Mỗi lần chọn item cách nhau 0,5 giây.
-- Không thực hiện lượt tiếp theo khi animation hoặc quá trình xóa/dồn khay chưa hoàn tất.
-- Chế độ tiếp tục cho tới khi board và khay trống, sau đó hiển thị màn hình thắng.
-
-### 5. Auto Lose
-
-- Khi nhấn `Auto Lose`, game bắt đầu từ một board mới hợp lệ.
-- Hệ thống chọn item sao cho không loại nào đạt đủ 3 item trong khay.
-- Mỗi lần chọn item cách nhau 0,5 giây.
-- Mục tiêu là tạo phân bố như `2 + 2 + 1` hoặc một phân bố tương đương để lấp đầy 5 ô mà không tạo match.
-- Board mới phải có đủ loại item để bảo đảm có thể tạo trạng thái thua này.
-- Khi đủ 5 ô, game hiển thị màn hình thua.
-
-## Quy tắc cho trạng thái bắt buộc thắng hoặc bắt buộc thua
-
-Các nút tự động trên Home screen sẽ luôn bắt đầu một level mới, thay vì tiếp tục một ván thủ công đang chơi dở. Trước khi chạy, hệ thống sẽ kiểm tra board có đạt được kết quả mong muốn hay không.
-
-- Nếu `Autoplay` không còn đường thắng từ trạng thái hiện tại, level sẽ được reset hoặc sinh lại rồi mới bắt đầu autoplay.
-- Nếu `Auto Lose` không thể lấp đầy 5 ô mà vẫn tránh một bộ ba, level sẽ được reset hoặc sinh lại với đủ loại item.
-- Nếu sau này cho phép bật chế độ tự động giữa một ván đang chơi, hệ thống phải phân tích trạng thái trước; khi kết quả yêu cầu không còn khả thi, nó sẽ khởi động lại level thay vì chạy sai mục tiêu.
-
-Nhờ quy tắc này, `Autoplay` luôn kết thúc bằng chiến thắng và `Auto Lose` luôn kết thúc bằng thất bại, không phụ thuộc vào một trạng thái dở dang không phù hợp.
-
-## Kiểm thử dự kiến
-
-- Xác nhận số lượng của từng loại item ban đầu chia hết cho 3.
-- Xác nhận khay luôn có đúng 5 cell.
-- Xác nhận lượt thứ năm tạo match được xử lý match trước khi kiểm tra thua.
-- Xác nhận thắng khi board và khay đều trống.
-- Xác nhận thua khi 5 ô đầy và không có match.
-- Xác nhận Autoplay luôn thắng với delay 0,5 giây giữa các lần chọn.
-- Xác nhận Auto Lose luôn thua với delay 0,5 giây giữa các lần chọn.
-- Xác nhận pause/resume không làm phát sinh thao tác tự động trùng lặp.
+The runtime and editor scripts compile successfully with Unity 2020.3.38f1, and the updated scene loads without missing Time Attack button references.
